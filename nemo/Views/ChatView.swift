@@ -12,7 +12,6 @@ struct ChatView: View {
     let conversationId: UUID
     @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: ChatViewModel
-    @FocusState private var isTextFieldFocused: Bool
     
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
@@ -22,42 +21,42 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             // メッセージリスト
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(viewModel.messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
-                        }
-                        
-                        if viewModel.isLoading {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(viewModel.messages) { message in
+                        if message.role == "user" {
                             HStack {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("考え中...")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(message.content)
+                                    .padding(12)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(18)
+                            }
+                        } else {
+                            HStack {
+                                Text(message.content)
+                                    .padding(12)
+                                    .background(Color(nsColor: .controlBackgroundColor))
+                                    .foregroundColor(.primary)
+                                    .cornerRadius(18)
                                 Spacer()
                             }
-                            .padding(.horizontal)
-                            .id("loading")
-                        }
-                    }
-                    .padding()
-                }
-                .onChange(of: viewModel.messages.count) { _, _ in
-                    if let lastMessage = viewModel.messages.last {
-                        withAnimation {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
                     }
                 }
-                .onChange(of: viewModel.isLoading) { _, isLoading in
-                    if isLoading {
-                        withAnimation {
-                            proxy.scrollTo("loading", anchor: .bottom)
-                        }
+                .padding()
+                
+                if viewModel.isLoading {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("考え中...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
                     }
+                    .padding(.horizontal)
                 }
             }
             
@@ -83,126 +82,26 @@ struct ChatView: View {
                 .background(Color.orange.opacity(0.1))
             }
             
-            // 入力エリア (iMessage風)
-            HStack(alignment: .bottom, spacing: 12) {
-                CustomTextField(
-                    text: $viewModel.messageText,
-                    isLoading: viewModel.isLoading,
-                    onSend: {
+            // 入力エリア
+            HStack(alignment: .bottom) {
+                TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .lineLimit(1...5)
+                    .onSubmit {
                         viewModel.sendMessage()
                     }
-                )
-                .focused($isTextFieldFocused)
+                    .disabled(viewModel.isLoading)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 12)
-            .background(Color(nsColor: .windowBackgroundColor))
-        }
-        .onAppear {
-            isTextFieldFocused = true
-        }
-    }
-}
-
-struct MessageBubble: View {
-    let message: Conversation
-    
-    var body: some View {
-        HStack {
-            if message.role == "user" {
-                Spacer(minLength: 60)
-            }
-            
-            Text(message.content)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    message.role == "user" 
-                    ? Color.blue 
-                    : Color(nsColor: .controlBackgroundColor)
-                )
-                .foregroundColor(
-                    message.role == "user" 
-                    ? .white 
-                    : .primary
-                )
-                .cornerRadius(18)
-            
-            if message.role != "user" {
-                Spacer(minLength: 60)
-            }
-        }
-    }
-}
-
-struct CustomTextField: NSViewRepresentable {
-    @Binding var text: String
-    let isLoading: Bool
-    let onSend: () -> Void
-    
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
-        
-        textView.delegate = context.coordinator
-        textView.isRichText = false
-        textView.font = .systemFont(ofSize: 13)
-        textView.textColor = .labelColor
-        textView.backgroundColor = NSColor.controlBackgroundColor
-        textView.drawsBackground = true
-        textView.textContainerInset = NSSize(width: 10, height: 8)
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        
-        scrollView.hasVerticalScroller = true
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = NSColor.controlBackgroundColor
-        scrollView.borderType = .lineBorder
-        
-        return scrollView
-    }
-    
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        let textView = scrollView.documentView as! NSTextView
-        if textView.string != text {
-            textView.string = text
-        }
-        context.coordinator.isLoading = isLoading
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, isLoading: isLoading, onSend: onSend)
-    }
-    
-    class Coordinator: NSObject, NSTextViewDelegate {
-        @Binding var text: String
-        var isLoading: Bool
-        let onSend: () -> Void
-        
-        init(text: Binding<String>, isLoading: Bool, onSend: @escaping () -> Void) {
-            _text = text
-            self.isLoading = isLoading
-            self.onSend = onSend
-        }
-        
-        func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-            text = textView.string
-        }
-        
-        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            // Enterキーで送信（Shiftが押されていない場合）
-            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                if let event = NSApp.currentEvent,
-                   !event.modifierFlags.contains(.shift) {
-                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading {
-                        onSend()
-                        return true
-                    }
-                }
-            }
-            return false
+            .padding()
         }
     }
 }
