@@ -1,0 +1,231 @@
+{
+  "" : {
+    "const-values" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary.swiftconstvalues",
+    "dependencies" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary.d",
+    "diagnostics" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary.dia",
+    "emit-module-dependencies" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary-emit-module.dia",
+    "pch" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire-primary.swiftdeps"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/AFError.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AFError.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AFError.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AFError.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/DataRequest.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataRequest.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataRequest.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataRequest.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/DataStreamRequest.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/DownloadRequest.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DownloadRequest.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DownloadRequest.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DownloadRequest.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/HTTPHeaders.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPHeaders.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPHeaders.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPHeaders.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/HTTPMethod.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPMethod.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPMethod.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/HTTPMethod.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/Notifications.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Notifications.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Notifications.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Notifications.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/ParameterEncoder.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoder.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoder.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoder.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/ParameterEncoding.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoding.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoding.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ParameterEncoding.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/Protected.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Protected.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Protected.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Protected.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/Request.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Request.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Request.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Request.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/RequestTaskMap.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestTaskMap.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestTaskMap.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestTaskMap.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/Response.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Response.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Response.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Response.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/Session.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Session.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Session.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Session.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/SessionDelegate.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/SessionDelegate.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/SessionDelegate.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/SessionDelegate.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/URLConvertible+URLRequestConvertible.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLConvertible+URLRequestConvertible.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLConvertible+URLRequestConvertible.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLConvertible+URLRequestConvertible.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/UploadRequest.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/UploadRequest.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/UploadRequest.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/UploadRequest.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Core/WebSocketRequest.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/WebSocketRequest.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/WebSocketRequest.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/WebSocketRequest.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/DispatchQueue+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/OperationQueue+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OperationQueue+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OperationQueue+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OperationQueue+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/Result+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Result+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Result+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Result+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/StringEncoding+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/StringEncoding+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/StringEncoding+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/StringEncoding+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/URLRequest+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLRequest+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLRequest+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLRequest+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Extensions/URLSessionConfiguration+Alamofire.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLSessionConfiguration+Alamofire.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLSessionConfiguration+Alamofire.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLSessionConfiguration+Alamofire.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/AlamofireExtended.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AlamofireExtended.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AlamofireExtended.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AlamofireExtended.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/AuthenticationInterceptor.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AuthenticationInterceptor.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AuthenticationInterceptor.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/AuthenticationInterceptor.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/CachedResponseHandler.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/CachedResponseHandler.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/CachedResponseHandler.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/CachedResponseHandler.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/Combine.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Combine.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Combine.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Combine.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/Concurrency.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Concurrency.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Concurrency.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Concurrency.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/EventMonitor.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/EventMonitor.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/EventMonitor.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/EventMonitor.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/MultipartFormData.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartFormData.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartFormData.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartFormData.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/MultipartUpload.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartUpload.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartUpload.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/MultipartUpload.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/NetworkReachabilityManager.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/NetworkReachabilityManager.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/NetworkReachabilityManager.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/NetworkReachabilityManager.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/OfflineRetrier.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OfflineRetrier.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OfflineRetrier.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/OfflineRetrier.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/RedirectHandler.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RedirectHandler.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RedirectHandler.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RedirectHandler.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/RequestCompression.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestCompression.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestCompression.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestCompression.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/RequestInterceptor.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestInterceptor.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestInterceptor.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RequestInterceptor.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/ResponseSerialization.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ResponseSerialization.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ResponseSerialization.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ResponseSerialization.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/RetryPolicy.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RetryPolicy.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RetryPolicy.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/RetryPolicy.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/ServerTrustEvaluation.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ServerTrustEvaluation.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ServerTrustEvaluation.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/ServerTrustEvaluation.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/URLEncodedFormEncoder.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLEncodedFormEncoder.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLEncodedFormEncoder.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/URLEncodedFormEncoder.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/Source/Features/Validation.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Validation.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Validation.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/Validation.o"
+  },
+  "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/DerivedSources/resource_bundle_accessor.swift" : {
+    "index-unit-output-path" : "/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/resource_bundle_accessor.o",
+    "llvm-bc" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/resource_bundle_accessor.bc",
+    "object" : "/Users/hayashieisuke/Library/Developer/Xcode/DerivedData/nemo-bzgtbjxzgepqzigoecrjlbwjsaxa/SourcePackages/checkouts/Alamofire/build/Alamofire.build/Release/Alamofire.build/Objects-normal/x86_64/resource_bundle_accessor.o"
+  }
+}

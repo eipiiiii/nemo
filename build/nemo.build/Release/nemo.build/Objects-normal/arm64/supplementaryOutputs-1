@@ -1,0 +1,12 @@
+{
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Models/Conversation.swift" : {
+    "abi-baseline-json" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo.abi.json",
+    "const-values" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo-primary.swiftconstvalues",
+    "dependencies" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo-primary.d",
+    "diagnostics" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo-primary.dia",
+    "objc-header" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo-Swift.h",
+    "swiftdoc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo.swiftdoc",
+    "swiftmodule" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo.swiftmodule",
+    "swiftsourceinfo" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/arm64/nemo.swiftsourceinfo"
+  }
+}

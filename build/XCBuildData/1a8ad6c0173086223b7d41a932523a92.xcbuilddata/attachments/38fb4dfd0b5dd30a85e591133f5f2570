@@ -1,0 +1,66 @@
+{
+  "" : {
+    "const-values" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary.swiftconstvalues",
+    "dependencies" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary.d",
+    "diagnostics" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary.dia",
+    "emit-module-dependencies" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary-emit-module.dia",
+    "pch" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemo-primary.swiftdeps"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/GeneratedAssetSymbols.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/ContentView.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/ContentView.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ContentView.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ContentView.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Item.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/Item.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Item.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Item.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Models/Conversation.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/Conversation.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Conversation.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Conversation.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Models/Model.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/Model.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Model.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/Model.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Services/OpenRouterService.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/OpenRouterService.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/OpenRouterService.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/OpenRouterService.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/ViewModels/ChatViewModel.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatViewModel.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatViewModel.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatViewModel.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/ViewModels/SettingsViewModel.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsViewModel.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsViewModel.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsViewModel.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Views/ChatView.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatView.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatView.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/ChatView.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/Views/SettingsView.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsView.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsView.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/SettingsView.o"
+  },
+  "/Users/hayashieisuke/Projects/swift/nemo/nemo/nemoApp.swift" : {
+    "index-unit-output-path" : "/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemoApp.o",
+    "llvm-bc" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemoApp.bc",
+    "object" : "/Users/hayashieisuke/Projects/swift/nemo/build/nemo.build/Release/nemo.build/Objects-normal/x86_64/nemoApp.o"
+  }
+}
