@@ -6,14 +6,16 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct ChatView: View {
     let conversationId: UUID
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: ChatViewModel
     
-    init(conversationId: UUID) {
+    init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
-        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: .init()))
+        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
     }
 
     var body: some View {
@@ -94,10 +96,15 @@ struct ChatView: View {
             .padding()
         }
         .navigationTitle("チャット")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 #Preview {
-    ChatView(conversationId: UUID())
+    // Preview requires a proper ModelContainer setup
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: Conversation.self, configurations: config)
+    let context = ModelContext(container)
+    
+    return ChatView(conversationId: UUID(), modelContext: context)
+        .modelContainer(container)
 }
