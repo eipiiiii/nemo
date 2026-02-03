@@ -1,19 +1,19 @@
 import Foundation
 import Alamofire
 
-// 通信専用の型定義（Sendable準拠を明示的に保証）
-struct ModelsResponse: Decodable, Sendable {
+// 通信専用の型定義
+struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
 
-struct ChatRequest: Encodable, Sendable {
+struct ChatRequest: Codable, Sendable {
     let model: String
     let messages: [[String: String]]
 }
 
-struct ChatResponse: Decodable, Sendable {
-    struct Choice: Decodable, Sendable {
-        struct Message: Decodable, Sendable {
+struct ChatResponse: Codable, Sendable {
+    struct Choice: Codable, Sendable {
+        struct Message: Codable, Sendable {
             let content: String
         }
         let message: Message
@@ -21,7 +21,7 @@ struct ChatResponse: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// サービスの定義（nonisolatedで定義）
+// サービスの定義
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
     private let apiKeyKey = "openrouter_api_key"
@@ -41,7 +41,7 @@ final class OpenRouterService: Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             AF.request(url, headers: headers)
                 .validate()
-                .responseDecodable(of: ModelsResponse.self) { response in
+                .responseDecodable(of: ModelsResponse.self, queue: .global()) { response in
                     switch response.result {
                     case .success(let modelsResponse):
                         continuation.resume(returning: modelsResponse.data)
@@ -69,7 +69,7 @@ final class OpenRouterService: Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             AF.request(url, method: .post, parameters: requestBody, encoder: JSONParameterEncoder.default, headers: headers)
                 .validate()
-                .responseDecodable(of: ChatResponse.self) { response in
+                .responseDecodable(of: ChatResponse.self, queue: .global()) { response in
                     switch response.result {
                     case .success(let chatResponse):
                         if let content = chatResponse.choices.first?.message.content {
