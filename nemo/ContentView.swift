@@ -13,6 +13,7 @@ struct ContentView: View {
     @Query private var conversations: [Conversation]
     @State private var selectedConversationId: UUID?
     @State private var showingSettings = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     
     var conversationGroups: [UUID: [Conversation]] {
         Dictionary(grouping: conversations, by: { $0.conversationId })
@@ -27,7 +28,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             // サイドバー
             List(selection: $selectedConversationId) {
                 ForEach(conversationTitles, id: \.0) { conversationId, title, date in
@@ -54,6 +55,7 @@ struct ContentView: View {
                 .onDelete(perform: deleteConversations)
             }
             .navigationTitle("会話")
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: createNewConversation) {
@@ -71,6 +73,7 @@ struct ContentView: View {
         } detail: {
             if let selectedId = selectedConversationId {
                 ChatView(conversationId: selectedId, modelContext: modelContext)
+                    .id(selectedId)
             } else {
                 VStack(spacing: 16) {
                     Image(systemName: "bubble.left.and.bubble.right")
