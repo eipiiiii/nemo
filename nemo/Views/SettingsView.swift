@@ -57,7 +57,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("設定")
-            .navigationBarTitleDisplayMode(.inline)
         }
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
@@ -68,6 +67,7 @@ struct SettingsView: View {
 struct ModelSelectionView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var searchText = ""
+    @Environment(\.dismiss) private var dismiss
     
     var filteredModels: [Model] {
         if searchText.isEmpty {
@@ -133,7 +133,6 @@ struct ModelSelectionView: View {
                 }
             }
             .navigationTitle("モデル選択")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("閉じる") {
