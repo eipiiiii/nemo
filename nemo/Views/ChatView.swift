@@ -10,53 +10,63 @@ import SwiftData
 
 struct ChatView: View {
     let conversationId: UUID
-    @Environment(\.modelContext) private var modelContext
+    let modelContext: ModelContext
     @StateObject private var viewModel: ChatViewModel
     
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
+        self.modelContext = modelContext
         _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // メッセージリスト
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(viewModel.messages) { message in
-                        if message.role == "user" {
-                            HStack {
-                                Spacer()
-                                Text(message.content)
-                                    .padding(12)
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(18)
-                            }
-                        } else {
-                            HStack {
-                                Text(message.content)
-                                    .padding(12)
-                                    .background(Color(nsColor: .controlBackgroundColor))
-                                    .foregroundColor(.primary)
-                                    .cornerRadius(18)
-                                Spacer()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(viewModel.messages) { message in
+                            if message.role == "user" {
+                                HStack {
+                                    Spacer()
+                                    Text(message.content)
+                                        .padding(12)
+                                        .background(Color.blue)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(18)
+                                }
+                            } else {
+                                HStack {
+                                    Text(message.content)
+                                        .padding(12)
+                                        .background(Color(nsColor: .controlBackgroundColor))
+                                        .foregroundColor(.primary)
+                                        .cornerRadius(18)
+                                    Spacer()
+                                }
                             }
                         }
                     }
-                }
-                .padding()
-                
-                if viewModel.isLoading {
-                    HStack {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("考え中...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                    .padding()
+                    
+                    if viewModel.isLoading {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("考え中...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
+                }
+                .onChange(of: viewModel.messages.count) { _, _ in
+                    if let lastMessage = viewModel.messages.last {
+                        withAnimation {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
                 }
             }
             
@@ -103,6 +113,7 @@ struct ChatView: View {
             }
             .padding()
         }
+        .id(conversationId) // これがconversationIdが変わったらViewを再生成させる
     }
 }
 
