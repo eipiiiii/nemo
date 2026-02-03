@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		3582B2A72F2E52AC00CE5F1D /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 3582B2A62F2E52AC00CE5F1D /* Alamofire */; };
-		3582B2A92F2E52AC00CE5F1D /* AlamofireDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = 3582B2A82F2E52AC00CE5F1D /* AlamofireDynamic */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,7 +57,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3582B2A72F2E52AC00CE5F1D /* Alamofire in Frameworks */,
-				3582B2A92F2E52AC00CE5F1D /* AlamofireDynamic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
