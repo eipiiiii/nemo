@@ -11,92 +11,90 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var conversations: [Conversation]
-    @State private var newConversationTitle = ""
-    @State private var showingNewConversationSheet = false
     @State private var selectedConversationId: UUID?
+    @State private var showingSettings = false
     
     var conversationGroups: [UUID: [Conversation]] {
         Dictionary(grouping: conversations, by: { $0.conversationId })
     }
     
-    var conversationTitles: [(UUID, String)] {
+    var conversationTitles: [(UUID, String, Date)] {
         conversationGroups.map { conversationId, convs in
             let title = convs.first(where: { $0.role == "user" })?.content.prefix(30).description ?? "新しい会話"
-            return (conversationId, String(title))
-        }
+            let date = convs.last?.timestamp ?? Date()
+            return (conversationId, String(title), date)
+        }.sorted { $0.2 > $1.2 }
     }
 
     var body: some View {
         NavigationSplitView {
+            // サイドバー
             List(selection: $selectedConversationId) {
-                Section("会話") {
-                    ForEach(conversationTitles, id: \.0) { conversationId, title in
-                        NavigationLink(value: conversationId) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(title)
-                                    .font(.headline)
-                                if let lastMessage = conversationGroups[conversationId]?.last {
-                                    Text(lastMessage.content.prefix(50).description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                ForEach(conversationTitles, id: \.0) { conversationId, title, date in
+                    NavigationLink(value: conversationId) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title)
+                                .font(.headline)
+                                .lineLimit(1)
+                            if let lastMessage = conversationGroups[conversationId]?.last {
+                                Text(lastMessage.content)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
                             }
                         }
-                        .contextMenu {
-                            Button("タイトルを編集") {
-                                newConversationTitle = title
-                                selectedConversationId = conversationId
-                                showingNewConversationSheet = true
-                            }
-                            Button("削除", role: .destructive) {
-                                deleteConversation(conversationId: conversationId)
-                            }
+                        .padding(.vertical, 4)
+                    }
+                    .contextMenu {
+                        Button("削除", role: .destructive) {
+                            deleteConversation(conversationId: conversationId)
                         }
                     }
                 }
+                .onDelete(perform: deleteConversations)
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250)
+            .navigationTitle("会話")
             .toolbar {
-                ToolbarItem {
-                    Button(action: {
-                        showingNewConversationSheet = true
-                    }) {
-                        Label("新しい会話", systemImage: "plus")
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: createNewConversation) {
+                        Image(systemName: "square.and.pencil")
                     }
+                    .help("新しい会話")
                 }
-                ToolbarItem {
-                    NavigationLink(destination: SettingsView()) {
-                        Label("設定", systemImage: "gear")
+                ToolbarItem(placement: .navigation) {
+                    Button(action: { showingSettings = true }) {
+                        Image(systemName: "gear")
                     }
+                    .help("設定")
                 }
             }
         } detail: {
             if let selectedId = selectedConversationId {
                 ChatView(conversationId: selectedId, modelContext: modelContext)
             } else {
-                Text("会話を選択してください")
-                    .foregroundColor(.secondary)
+                VStack(spacing: 16) {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.system(size: 64))
+                        .foregroundColor(.secondary)
+                    Text("会話を選択するか、新しい会話を開始してください")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button(action: createNewConversation) {
+                        Label("新しい会話", systemImage: "square.and.pencil")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .sheet(isPresented: $showingNewConversationSheet) {
-            NewConversationSheet(
-                title: $newConversationTitle,
-                onSave: { title in
-                    createNewConversation(title: title)
-                    showingNewConversationSheet = false
-                }
-            )
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+                .frame(minWidth: 600, minHeight: 500)
         }
     }
     
-    private func createNewConversation(title: String) {
+    private func createNewConversation() {
         let conversationId = UUID()
-        let firstMessage = Conversation(
-            role: "user",
-            content: title.isEmpty ? "新しい会話" : title,
-            conversationId: conversationId
-        )
-        modelContext.insert(firstMessage)
         selectedConversationId = conversationId
     }
     
@@ -109,37 +107,11 @@ struct ContentView: View {
             selectedConversationId = nil
         }
     }
-}
-
-struct NewConversationSheet: View {
-    @Binding var title: String
-    let onSave: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
     
-    var body: some View {
-        NavigationView {
-            VStack {
-                TextField("会話のタイトル", text: $title)
-                    .textFieldStyle(.roundedBorder)
-                    .padding()
-                
-                Spacer()
-            }
-            .navigationTitle("新しい会話")
-            .toolbar {
-                ToolbarItem {
-                    Button("キャンセル") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem {
-                    Button("作成") {
-                        onSave(title)
-                        dismiss()
-                    }
-                    .disabled(title.isEmpty)
-                }
-            }
+    private func deleteConversations(at offsets: IndexSet) {
+        for index in offsets {
+            let conversationId = conversationTitles[index].0
+            deleteConversation(conversationId: conversationId)
         }
     }
 }
