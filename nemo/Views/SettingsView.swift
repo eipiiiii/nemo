@@ -10,54 +10,123 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @State private var showingModelSelection = false
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("API設定") {
-                    TextField("OpenRouter APIキー", text: $viewModel.apiKey, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit {
-                            viewModel.saveApiKey()
-                            viewModel.fetchModels()
-                        }
-                    
-                    Button("モデル一覧を取得") {
-                        viewModel.saveApiKey()
-                        viewModel.fetchModels()
-                    }
-                    .disabled(viewModel.isLoading)
+        VStack(spacing: 0) {
+            // ヘッダー
+            HStack {
+                Text("設定")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("完了") {
+                    dismiss()
                 }
-                
-                Section("選択中のモデル") {
-                    if !viewModel.selectedModelId.isEmpty {
-                        Text("選択中: \(viewModel.selectedModelId)")
-                        Button("モデルを選択") {
-                            showingModelSelection = true
-                        }
-                    } else {
-                        Text("未選択")
-                        Button("モデルを選択") {
-                            showingModelSelection = true
-                        }
-                    }
-                }
-                
-                if viewModel.isLoading {
-                    Section("読み込み中...") {
-                        ProgressView()
-                    }
-                }
-                
-                if let errorMessage = viewModel.errorMessage {
-                    Section("エラー") {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                    }
-                }
+                .keyboardShortcut(.defaultAction)
             }
-            .navigationTitle("設定")
+            .padding()
+            .background(Color(nsColor: .windowBackgroundColor))
+            
+            Divider()
+            
+            // コンテンツ
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // API設定
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("OpenRouter API")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("APIキー")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            SecureField("APIキーを入力", text: $viewModel.apiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit {
+                                    viewModel.saveApiKey()
+                                }
+                            
+                            Button("モデル一覧を取得") {
+                                viewModel.saveApiKey()
+                                viewModel.fetchModels()
+                            }
+                            .disabled(viewModel.isLoading || viewModel.apiKey.isEmpty)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // モデル選択
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("選択中のモデル")
+                            .font(.headline)
+                        
+                        if !viewModel.selectedModelId.isEmpty {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(viewModel.selectedModelId)
+                                        .font(.subheadline)
+                                    Text("選択中")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Button("変更") {
+                                    showingModelSelection = true
+                                }
+                                .disabled(viewModel.models.isEmpty)
+                            }
+                            .padding()
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(8)
+                        } else {
+                            Text("モデルが選択されていません")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Button("モデルを選択") {
+                                showingModelSelection = true
+                            }
+                            .disabled(viewModel.models.isEmpty)
+                        }
+                    }
+                    
+                    // ローディング表示
+                    if viewModel.isLoading {
+                        Divider()
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("読み込み中...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // エラー表示
+                    if let errorMessage = viewModel.errorMessage {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("エラー")
+                                    .font(.headline)
+                            }
+                            Text(errorMessage)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                }
+                .padding()
+            }
         }
+        .frame(minWidth: 600, minHeight: 500)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
@@ -81,66 +150,106 @@ struct ModelSelectionView: View {
     }
     
     var body: some View {
-        NavigationView {
-            List {
-                Section("検索") {
-                    TextField("モデル名で検索", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
+        VStack(spacing: 0) {
+            // ヘッダー
+            HStack {
+                Text("モデル選択")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("完了") {
+                    dismiss()
                 }
-                
-                Section("モデル一覧") {
-                    ForEach(filteredModels) { model in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(model.name)
-                                    .font(.headline)
-                                if let description = model.description {
-                                    Text(description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                HStack {
-                                    if let contextLength = model.contextLength {
-                                        Text("コンテキスト: \(contextLength)")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    if let pricing = model.pricing {
-                                        if let prompt = pricing.prompt {
-                                            Text("入力: $\(prompt)")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        if let completion = pricing.completion {
-                                            Text("出力: $\(completion)")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer()
-                            if viewModel.selectedModelId == model.id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            viewModel.selectModel(model)
-                        }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding()
+            
+            Divider()
+            
+            // 検索バー
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("モデル名で検索", text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .navigationTitle("モデル選択")
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button("閉じる") {
-                        dismiss()
+            .padding(8)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(8)
+            .padding()
+            
+            Divider()
+            
+            // モデルリスト
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredModels) { model in
+                        Button(action: {
+                            viewModel.selectModel(model)
+                            dismiss()
+                        }) {
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(model.name)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    if let description = model.description {
+                                        Text(description)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    
+                                    HStack(spacing: 12) {
+                                        if let contextLength = model.contextLength {
+                                            Label("\(contextLength)", systemImage: "text.alignleft")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        if let pricing = model.pricing {
+                                            if let prompt = pricing.prompt {
+                                                Label("$\(prompt)", systemImage: "arrow.down")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            if let completion = pricing.completion {
+                                                Label("$\(completion)", systemImage: "arrow.up")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                if viewModel.selectedModelId == model.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .font(.title3)
+                                }
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(viewModel.selectedModelId == model.id ? Color.blue.opacity(0.1) : Color.clear)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider()
                     }
                 }
             }
         }
+        .frame(minWidth: 700, minHeight: 600)
     }
 }
 
