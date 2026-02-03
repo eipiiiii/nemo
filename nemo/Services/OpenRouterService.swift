@@ -1,7 +1,7 @@
 import Foundation
 import Alamofire
 
-// 通信専用の型定義（Model.swiftと重複しないようにここで定義）
+// 通信専用の型定義（Sendable準拠を明示的に保証）
 struct ModelsResponse: Decodable, Sendable {
     let data: [Model]
 }
@@ -21,12 +21,12 @@ struct ChatResponse: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// サービスの定義（@MainActorは外す）
-class OpenRouterService {
+// サービスの定義（nonisolatedで定義）
+final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
     private let apiKeyKey = "openrouter_api_key"
     
-    func getModels() async throws -> [Model] {
+    nonisolated func getModels() async throws -> [Model] {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
             throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
@@ -38,15 +38,21 @@ class OpenRouterService {
         ]
         
         // 非同期リクエストの実行
-        let response = try await AF.request(url, headers: headers)
-            .validate()
-            .serializingDecodable(ModelsResponse.self)
-            .value
-            
-        return response.data
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.request(url, headers: headers)
+                .validate()
+                .responseDecodable(of: ModelsResponse.self) { response in
+                    switch response.result {
+                    case .success(let modelsResponse):
+                        continuation.resume(returning: modelsResponse.data)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+        }
     }
     
-    func sendMessage(messages: [[String: String]], modelId: String) async throws -> String {
+    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws -> String {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
             throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
@@ -60,15 +66,21 @@ class OpenRouterService {
         let requestBody = ChatRequest(model: modelId, messages: messages)
         
         // 非同期リクエストの実行
-        let response = try await AF.request(url, method: .post, parameters: requestBody, encoder: JSONParameterEncoder.default, headers: headers)
-            .validate()
-            .serializingDecodable(ChatResponse.self)
-            .value
-        
-        guard let content = response.choices.first?.message.content else {
-            throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "無効なレスポンス"])
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.request(url, method: .post, parameters: requestBody, encoder: JSONParameterEncoder.default, headers: headers)
+                .validate()
+                .responseDecodable(of: ChatResponse.self) { response in
+                    switch response.result {
+                    case .success(let chatResponse):
+                        if let content = chatResponse.choices.first?.message.content {
+                            continuation.resume(returning: content)
+                        } else {
+                            continuation.resume(throwing: NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "無効なレスポンス"]))
+                        }
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
         }
-        
-        return content
     }
 }
