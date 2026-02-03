@@ -72,7 +72,7 @@ struct ContentView: View {
             }
         } detail: {
             if let selectedId = selectedConversationId {
-                ChatView(conversationId: selectedId)
+                ChatView(conversationId: selectedId, modelContext: modelContext)
             } else {
                 Text("会話を選択してください")
                     .foregroundColor(.secondary)
