@@ -37,14 +37,20 @@ final class OpenRouterService: Sendable {
             "Content-Type": "application/json"
         ]
         
-        // 非同期リクエストの実行
+        // 手動でJSONをデコード
         return try await withCheckedThrowingContinuation { continuation in
             AF.request(url, headers: headers)
                 .validate()
-                .responseDecodable(of: ModelsResponse.self, queue: .global()) { response in
+                .responseData(queue: .global()) { response in
                     switch response.result {
-                    case .success(let modelsResponse):
-                        continuation.resume(returning: modelsResponse.data)
+                    case .success(let data):
+                        do {
+                            let decoder = JSONDecoder()
+                            let modelsResponse = try decoder.decode(ModelsResponse.self, from: data)
+                            continuation.resume(returning: modelsResponse.data)
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
                     case .failure(let error):
                         continuation.resume(throwing: error)
                     }
@@ -65,22 +71,38 @@ final class OpenRouterService: Sendable {
         
         let requestBody = ChatRequest(model: modelId, messages: messages)
         
-        // 非同期リクエストの実行
+        // 手動でJSONをエンコード/デコード
         return try await withCheckedThrowingContinuation { continuation in
-            AF.request(url, method: .post, parameters: requestBody, encoder: JSONParameterEncoder.default, headers: headers)
-                .validate()
-                .responseDecodable(of: ChatResponse.self, queue: .global()) { response in
-                    switch response.result {
-                    case .success(let chatResponse):
-                        if let content = chatResponse.choices.first?.message.content {
-                            continuation.resume(returning: content)
-                        } else {
-                            continuation.resume(throwing: NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "無効なレスポンス"]))
+            do {
+                let encoder = JSONEncoder()
+                let jsonData = try encoder.encode(requestBody)
+                
+                var request = try URLRequest(url: url, method: .post, headers: headers)
+                request.httpBody = jsonData
+                
+                AF.request(request)
+                    .validate()
+                    .responseData(queue: .global()) { response in
+                        switch response.result {
+                        case .success(let data):
+                            do {
+                                let decoder = JSONDecoder()
+                                let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+                                if let content = chatResponse.choices.first?.message.content {
+                                    continuation.resume(returning: content)
+                                } else {
+                                    continuation.resume(throwing: NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "無効なレスポンス"]))
+                                }
+                            } catch {
+                                continuation.resume(throwing: error)
+                            }
+                        case .failure(let error):
+                            continuation.resume(throwing: error)
                         }
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
                     }
-                }
+            } catch {
+                continuation.resume(throwing: error)
+            }
         }
     }
 }
