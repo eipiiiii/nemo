@@ -134,7 +134,7 @@ struct ModelSelectionView: View {
             }
             .navigationTitle("モデル選択")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("閉じる") {
                         dismiss()
                     }
