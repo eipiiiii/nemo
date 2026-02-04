@@ -56,6 +56,8 @@ struct ContentView: View {
             }
             .navigationTitle("会話")
             .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+            .scrollContentBackground(.hidden)
+            .background(Color(nsColor: .controlBackgroundColor))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: createNewConversation) {
@@ -88,6 +90,7 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
             }
         }
         .sheet(isPresented: $showingSettings) {
