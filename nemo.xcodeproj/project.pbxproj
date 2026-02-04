@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		351808C62F3301F800D8DD05 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 351808C52F3301F800D8DD05 /* Alamofire */; };
+		351808C92F3304D200D8DD05 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 351808C82F3304D200D8DD05 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				351808C62F3301F800D8DD05 /* Alamofire in Frameworks */,
+				351808C92F3304D200D8DD05 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 			name = nemo;
 			packageProductDependencies = (
 				351808C52F3301F800D8DD05 /* Alamofire */,
+				351808C82F3304D200D8DD05 /* MarkdownUI */,
 			);
 			productName = nemo;
 			productReference = 3582B24E2F2D8A1C00CE5F1D /* nemo.app */;
@@ -203,6 +206,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3582B24F2F2D8A1C00CE5F1D /* Products */;
@@ -612,6 +616,14 @@
 				minimumVersion = 5.11.1;
 			};
 		};
+		351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -619,6 +631,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		351808C82F3304D200D8DD05 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
