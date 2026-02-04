@@ -22,38 +22,43 @@ struct ChatView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // メッセージリスト（画面全体に広がる）
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(viewModel.messages) { message in
-                            MessageBubbleView(message: message)
-                                .id(message.id)
-                        }
-                    }
-                    .padding()
-                    .padding(.bottom, 100) // 入力バーの高さ分の余白
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .onChange(of: viewModel.messages.count) { _, _ in
-                    if let lastMessage = viewModel.messages.last {
-                        withAnimation {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                }
-                .onChange(of: viewModel.isLoading) { _, isLoading in
-                    if !isLoading, let lastMessage = viewModel.messages.last {
-                        withAnimation {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-            .background(Color(nsColor: .windowBackgroundColor))
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
             
-            // 入力エリア（重ねる）
             VStack(spacing: 0) {
+                // メッセージリスト
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(viewModel.messages) { message in
+                                MessageBubbleView(message: message)
+                                    .id(message.id)
+                            }
+                        }
+                        .padding()
+                        .padding(.bottom, 120)
+                    }
+                    .onChange(of: viewModel.messages.count) { _, _ in
+                        if let lastMessage = viewModel.messages.last {
+                            withAnimation {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: viewModel.isLoading) { _, isLoading in
+                        if !isLoading, let lastMessage = viewModel.messages.last {
+                            withAnimation {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // 入力エリア（下部に重ねる）
+            VStack(alignment: .leading, spacing: 0) {
                 // エラー表示
                 if let errorMessage = viewModel.errorMessage {
                     HStack {
@@ -72,10 +77,9 @@ struct ChatView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .background(Color.orange.opacity(0.1))
-                    .frame(maxWidth: .infinity)
                 }
                 
-                // 入力バー
+                // 入力フィールド
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -96,13 +100,8 @@ struct ChatView: View {
                         .disabled(viewModel.isLoading)
                 }
                 .padding()
-                .background(
-                    Color(nsColor: .windowBackgroundColor)
-                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
         .id(conversationId)
     }
 }
@@ -118,7 +117,6 @@ struct MessageBubbleView: View {
             
             Group {
                 if message.role == "user" {
-                    // ユーザーメッセージは通常のText
                     Text(message.content)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -126,7 +124,6 @@ struct MessageBubbleView: View {
                         .foregroundColor(.white)
                         .cornerRadius(18)
                 } else {
-                    // AIメッセージはMarkdown表示
                     Markdown(message.content)
                         .markdownTheme(.gitHub)
                         .markdownTextStyle {
