@@ -54,7 +54,6 @@ struct ChatView: View {
                     }
                 }
                 
-                Spacer()
             }
             // メッセージ下部のグラデーション
             .overlay(alignment: .bottom) {
