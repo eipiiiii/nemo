@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3582B2A72F2E52AC00CE5F1D /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 3582B2A62F2E52AC00CE5F1D /* Alamofire */; };
+		351808C62F3301F800D8DD05 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 351808C52F3301F800D8DD05 /* Alamofire */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,7 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3582B2A72F2E52AC00CE5F1D /* Alamofire in Frameworks */,
+				351808C62F3301F800D8DD05 /* Alamofire in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,8 +117,7 @@
 			);
 			name = nemo;
 			packageProductDependencies = (
-				3582B2A62F2E52AC00CE5F1D /* Alamofire */,
-				3582B2A82F2E52AC00CE5F1D /* AlamofireDynamic */,
+				351808C52F3301F800D8DD05 /* Alamofire */,
 			);
 			productName = nemo;
 			productReference = 3582B24E2F2D8A1C00CE5F1D /* nemo.app */;
@@ -203,7 +202,7 @@
 			mainGroup = 3582B2452F2D8A1C00CE5F1D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				3582B2A52F2E52AC00CE5F1D /* XCRemoteSwiftPackageReference "Alamofire" */,
+				351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3582B24F2F2D8A1C00CE5F1D /* Products */;
@@ -605,26 +604,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		3582B2A52F2E52AC00CE5F1D /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+		351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Alamofire/Alamofire";
+			repositoryURL = "https://github.com/Alamofire/Alamofire#";
 			requirement = {
 				kind = upToNextMinorVersion;
-				minimumVersion = 5.11.0;
+				minimumVersion = 5.11.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		3582B2A62F2E52AC00CE5F1D /* Alamofire */ = {
+		351808C52F3301F800D8DD05 /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 3582B2A52F2E52AC00CE5F1D /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = 351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
-		};
-		3582B2A82F2E52AC00CE5F1D /* AlamofireDynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 3582B2A52F2E52AC00CE5F1D /* XCRemoteSwiftPackageReference "Alamofire" */;
-			productName = AlamofireDynamic;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
