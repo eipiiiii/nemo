@@ -56,6 +56,20 @@ struct ChatView: View {
                 
                 Spacer()
             }
+            // メッセージ下部のグラデーション
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(nsColor: .windowBackgroundColor).opacity(0),
+                        Color(nsColor: .windowBackgroundColor).opacity(0.5),
+                        Color(nsColor: .windowBackgroundColor).opacity(1)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 100)
+                .pointerEvents(.none)
+            }
             
             // 入力エリア（下部に重ねる）
             VStack(alignment: .leading, spacing: 0) {
@@ -79,7 +93,7 @@ struct ChatView: View {
                     .background(Color.orange.opacity(0.1))
                 }
                 
-                // 入力フィールド
+                // 入力フィールド（グラス効果付き）
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -87,11 +101,15 @@ struct ChatView: View {
                         .padding(.vertical, 10)
                         .background(
                             Capsule()
-                                .fill(Color(nsColor: .textBackgroundColor))
+                                .fill(Color(nsColor: .textBackgroundColor).opacity(0.7))
                         )
                         .overlay(
                             Capsule()
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                        )
+                        .background(
+                            Capsule()
+                                .fill(Material.thin)
                         )
                         .lineLimit(1...5)
                         .onSubmit {
