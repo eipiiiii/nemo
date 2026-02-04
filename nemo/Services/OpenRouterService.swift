@@ -25,10 +25,13 @@ struct ChatResponse: Codable, Sendable {
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
     private let apiKeyKey = "openrouter_api_key"
-    private let systemPromptKey = "system_prompt"
+    private let customPromptKey = "custom_prompt"
     
-    // デフォルトのシステムプロンプト
-    private let defaultSystemPrompt = "You are a helpful AI assistant."
+    // 固定のシステムプロンプト（アプリ側で管理、ユーザーは編集不可）
+    private let systemPrompt = """
+    You are a helpful AI assistant.
+    Provide accurate, concise, and well-structured responses.
+    """
     
     nonisolated func getModels() async throws -> [Model] {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
@@ -67,11 +70,17 @@ final class OpenRouterService: Sendable {
             throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
         
-        // システムプロンプトを取得（設定されていなければデフォルトを使用）
-        let systemPrompt = UserDefaults.standard.string(forKey: systemPromptKey) ?? defaultSystemPrompt
+        // カスタムプロンプトを取得（ユーザーが編集可能）
+        let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
+        
+        // システムプロンプトとカスタムプロンプトを結合
+        var finalSystemPrompt = systemPrompt
+        if !customPrompt.isEmpty {
+            finalSystemPrompt += "\n\n# Custom Instructions\n\(customPrompt)"
+        }
         
         // システムプロンプトを先頭に追加
-        var allMessages = [["role": "system", "content": systemPrompt]]
+        var allMessages = [["role": "system", "content": finalSystemPrompt]]
         allMessages.append(contentsOf: messages)
         
         let url = "\(baseURL)/chat/completions"
