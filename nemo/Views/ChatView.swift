@@ -32,20 +32,8 @@ struct ChatView: View {
                         }
                     }
                     .padding()
-                    
-                    if viewModel.isLoading {
-                        HStack {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("考え中...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .id("loading")
-                    }
                 }
+                .background(Color(nsColor: .windowBackgroundColor))
                 .onChange(of: viewModel.messages.count) { _, _ in
                     if let lastMessage = viewModel.messages.last {
                         withAnimation {
@@ -94,7 +82,7 @@ struct ChatView: View {
                             .fill(Color(nsColor: .controlBackgroundColor))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
                             )
                     )
                     .lineLimit(1...5)
@@ -104,7 +92,9 @@ struct ChatView: View {
                     .disabled(viewModel.isLoading)
             }
             .padding()
+            .background(Color(nsColor: .windowBackgroundColor))
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .id(conversationId)
     }
 }
