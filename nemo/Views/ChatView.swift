@@ -68,7 +68,7 @@ struct ChatView: View {
                     endPoint: .bottom
                 )
                 .frame(height: 100)
-                .pointerEvents(.none)
+                .allowsHitTesting(false)
             }
             
             // 入力エリア（下部に重ねる）
