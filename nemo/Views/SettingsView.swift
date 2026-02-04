@@ -58,40 +58,42 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // システムプロンプト設定
+                    // カスタムプロンプト設定
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("システムプロンプト")
+                        Text("カスタム指示")
                             .font(.headline)
                         
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("AIの振る舞いや制約を設定できます")
+                            Text("AIの振る舞いや制約を追加できます（オプション）")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            TextEditor(text: $viewModel.systemPrompt)
-                                .font(.system(.body, design: .monospaced))
-                                .frame(height: 100)
-                                .padding(4)
+                            TextEditor(text: $viewModel.customPrompt)
+                                .font(.system(.body, design: .default))
+                                .frame(height: 120)
+                                .padding(8)
                                 .background(Color(nsColor: .textBackgroundColor))
-                                .cornerRadius(6)
+                                .cornerRadius(8)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
+                                    RoundedRectangle(cornerRadius: 8)
                                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                                 )
-                                .onChange(of: viewModel.systemPrompt) { _, _ in
-                                    viewModel.saveSystemPrompt()
+                                .onChange(of: viewModel.customPrompt) { _, _ in
+                                    viewModel.saveCustomPrompt()
                                 }
                             
                             HStack {
-                                Button("デフォルトにリセット") {
-                                    viewModel.systemPrompt = "You are a helpful AI assistant."
-                                    viewModel.saveSystemPrompt()
-                                }
-                                .font(.caption)
-                                Spacer()
-                                Text("\(viewModel.systemPrompt.count) 文字")
+                                Text("例: 「回答は日本語で、簡潔にまとめてください」")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                                Spacer()
+                                if !viewModel.customPrompt.isEmpty {
+                                    Button("クリア") {
+                                        viewModel.customPrompt = ""
+                                        viewModel.saveCustomPrompt()
+                                    }
+                                    .font(.caption)
+                                }
                             }
                         }
                     }
