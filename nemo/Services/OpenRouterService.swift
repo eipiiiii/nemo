@@ -31,6 +31,23 @@ final class OpenRouterService: Sendable {
     private let systemPrompt = """
     You are a helpful AI assistant.
     Provide accurate, concise, and well-structured responses.
+    
+    # Formatting Guidelines
+    Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
+    
+    - Use **bold** for emphasis on important points
+    - Use `inline code` for variable names, commands, or short code snippets
+    - Use code blocks with language specification for multi-line code:
+      ```swift
+      let example = "code here"
+      ```
+    - Use headings (## Heading) to structure longer responses
+    - Use bullet lists (-) or numbered lists (1.) for multiple items
+    - Use > blockquotes for important notes or warnings
+    - Use tables when comparing multiple items with different attributes
+    - Use --- for horizontal rules to separate major sections if needed
+    
+    Always format your responses in Markdown to make them clear and easy to read.
     """
     
     nonisolated func getModels() async throws -> [Model] {
