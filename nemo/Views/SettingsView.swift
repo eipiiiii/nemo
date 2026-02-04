@@ -168,8 +168,7 @@ struct SettingsView: View {
                 .padding()
             }
         }
-        .frame(width: 500)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 500, maxWidth: 600, minHeight: 400, maxHeight: 700)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
@@ -291,10 +290,8 @@ struct ModelSelectionView: View {
                     }
                 }
             }
-            .frame(height: 400)
         }
-        .frame(width: 600)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 600, maxWidth: 700, minHeight: 400, maxHeight: 600)
     }
 }
 
