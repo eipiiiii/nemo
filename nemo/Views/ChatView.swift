@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import MarkdownUI
 
 struct ChatView: View {
     let conversationId: UUID
@@ -26,25 +27,8 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         ForEach(viewModel.messages) { message in
-                            if message.role == "user" {
-                                HStack {
-                                    Spacer()
-                                    Text(message.content)
-                                        .padding(12)
-                                        .background(Color.blue)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(18)
-                                }
-                            } else {
-                                HStack {
-                                    Text(message.content)
-                                        .padding(12)
-                                        .background(Color(nsColor: .controlBackgroundColor))
-                                        .foregroundColor(.primary)
-                                        .cornerRadius(18)
-                                    Spacer()
-                                }
-                            }
+                            MessageBubbleView(message: message)
+                                .id(message.id)
                         }
                     }
                     .padding()
@@ -59,10 +43,18 @@ struct ChatView: View {
                             Spacer()
                         }
                         .padding(.horizontal)
+                        .id("loading")
                     }
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     if let lastMessage = viewModel.messages.last {
+                        withAnimation {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: viewModel.isLoading) { _, isLoading in
+                    if !isLoading, let lastMessage = viewModel.messages.last {
                         withAnimation {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
@@ -113,7 +105,57 @@ struct ChatView: View {
             }
             .padding()
         }
-        .id(conversationId) // これがconversationIdが変わったらViewを再生成させる
+        .id(conversationId)
+    }
+}
+
+struct MessageBubbleView: View {
+    let message: Conversation
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            if message.role == "user" {
+                Spacer(minLength: 60)
+            }
+            
+            Group {
+                if message.role == "user" {
+                    // ユーザーメッセージは通常のText
+                    Text(message.content)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(18)
+                } else {
+                    // AIメッセージはMarkdown表示
+                    Markdown(message.content)
+                        .markdownTheme(.gitHub)
+                        .markdownTextStyle {
+                            ForegroundColor(.primary)
+                            FontSize(14)
+                        }
+                        .markdownBlockStyle(\.codeBlock) { configuration in
+                            configuration.label
+                                .padding()
+                                .background(Color(nsColor: .textBackgroundColor))
+                                .cornerRadius(8)
+                                .markdownTextStyle {
+                                    FontFamilyVariant(.monospaced)
+                                    FontSize(13)
+                                }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .cornerRadius(18)
+                }
+            }
+            
+            if message.role != "user" {
+                Spacer(minLength: 60)
+            }
+        }
     }
 }
 
