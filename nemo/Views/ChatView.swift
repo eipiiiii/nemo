@@ -32,7 +32,8 @@ struct ChatView: View {
                         }
                     }
                     .padding()
-                    .padding(.bottom, 60) // 入力バーの高さ分の余白
+                    .padding(.bottom, 100) // 入力バーの高さ分の余白
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     if let lastMessage = viewModel.messages.last {
@@ -49,8 +50,9 @@ struct ChatView: View {
                     }
                 }
             }
+            .background(Color(nsColor: .windowBackgroundColor))
             
-            // 入力エリア（上に重ねる）
+            // 入力エリア（重ねる）
             VStack(spacing: 0) {
                 // エラー表示
                 if let errorMessage = viewModel.errorMessage {
@@ -70,6 +72,7 @@ struct ChatView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .background(Color.orange.opacity(0.1))
+                    .frame(maxWidth: .infinity)
                 }
                 
                 // 入力バー
@@ -95,10 +98,9 @@ struct ChatView: View {
                 .padding()
                 .background(
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(0.95)
-                        .background(.ultraThinMaterial)
                 )
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .id(conversationId)
