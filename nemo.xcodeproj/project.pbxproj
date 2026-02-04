@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		351808C62F3301F800D8DD05 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 351808C52F3301F800D8DD05 /* Alamofire */; };
 		351808C92F3304D200D8DD05 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 351808C82F3304D200D8DD05 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
@@ -57,7 +56,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				351808C62F3301F800D8DD05 /* Alamofire in Frameworks */,
 				351808C92F3304D200D8DD05 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -119,7 +117,6 @@
 			);
 			name = nemo;
 			packageProductDependencies = (
-				351808C52F3301F800D8DD05 /* Alamofire */,
 				351808C82F3304D200D8DD05 /* MarkdownUI */,
 			);
 			productName = nemo;
@@ -205,7 +202,6 @@
 			mainGroup = 3582B2452F2D8A1C00CE5F1D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */,
 				351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -608,14 +604,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Alamofire/Alamofire#";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 5.11.1;
-			};
-		};
 		351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
@@ -627,11 +615,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		351808C52F3301F800D8DD05 /* Alamofire */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 351808C42F3301F800D8DD05 /* XCRemoteSwiftPackageReference "Alamofire" */;
-			productName = Alamofire;
-		};
 		351808C82F3304D200D8DD05 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 351808C72F3304D200D8DD05 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
