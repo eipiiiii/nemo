@@ -25,6 +25,10 @@ struct ChatResponse: Codable, Sendable {
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
     private let apiKeyKey = "openrouter_api_key"
+    private let systemPromptKey = "system_prompt"
+    
+    // デフォルトのシステムプロンプト
+    private let defaultSystemPrompt = "You are a helpful AI assistant."
     
     nonisolated func getModels() async throws -> [Model] {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
@@ -63,13 +67,20 @@ final class OpenRouterService: Sendable {
             throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
         
+        // システムプロンプトを取得（設定されていなければデフォルトを使用）
+        let systemPrompt = UserDefaults.standard.string(forKey: systemPromptKey) ?? defaultSystemPrompt
+        
+        // システムプロンプトを先頭に追加
+        var allMessages = [["role": "system", "content": systemPrompt]]
+        allMessages.append(contentsOf: messages)
+        
         let url = "\(baseURL)/chat/completions"
         let headers: HTTPHeaders = [
             "Authorization": "Bearer \(apiKey)",
             "Content-Type": "application/json"
         ]
         
-        let requestBody = ChatRequest(model: modelId, messages: messages)
+        let requestBody = ChatRequest(model: modelId, messages: allMessages)
         
         // 手動でJSONをエンコード/デコード
         return try await withCheckedThrowingContinuation { continuation in
