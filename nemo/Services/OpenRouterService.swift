@@ -1,5 +1,4 @@
 import Foundation
-import Alamofire
 
 // 通信専用の型定義
 struct ModelsResponse: Codable, Sendable {
@@ -19,6 +18,27 @@ struct ChatResponse: Codable, Sendable {
         let message: Message
     }
     let choices: [Choice]
+}
+
+// エラー定義
+enum NetworkError: LocalizedError {
+    case invalidResponse
+    case httpError(Int)
+    case noData
+    case decodingError(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "無効なレスポンスです"
+        case .httpError(let code):
+            return "HTTPエラー: \(code)"
+        case .noData:
+            return "データが受信されませんでした"
+        case .decodingError(let error):
+            return "データの解析に失敗しました: \(error.localizedDescription)"
+        }
+    }
 }
 
 // サービスの定義
@@ -55,30 +75,31 @@ final class OpenRouterService: Sendable {
             throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
         
-        let url = "\(baseURL)/models"
-        let headers: HTTPHeaders = [
-            "Authorization": "Bearer \(apiKey)",
-            "Content-Type": "application/json"
-        ]
+        guard let url = URL(string: "\(baseURL)/models") else {
+            throw NetworkError.invalidResponse
+        }
         
-        // 手動でJSONをデコード
-        return try await withCheckedThrowingContinuation { continuation in
-            AF.request(url, headers: headers)
-                .validate()
-                .responseData(queue: .global()) { response in
-                    switch response.result {
-                    case .success(let data):
-                        do {
-                            let decoder = JSONDecoder()
-                            let modelsResponse = try decoder.decode(ModelsResponse.self, from: data)
-                            continuation.resume(returning: modelsResponse.data)
-                        } catch {
-                            continuation.resume(throwing: error)
-                        }
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
-                }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            let modelsResponse = try decoder.decode(ModelsResponse.self, from: data)
+            return modelsResponse.data
+        } catch {
+            throw NetworkError.decodingError(error)
         }
     }
     
@@ -100,46 +121,40 @@ final class OpenRouterService: Sendable {
         var allMessages = [["role": "system", "content": finalSystemPrompt]]
         allMessages.append(contentsOf: messages)
         
-        let url = "\(baseURL)/chat/completions"
-        let headers: HTTPHeaders = [
-            "Authorization": "Bearer \(apiKey)",
-            "Content-Type": "application/json"
-        ]
+        guard let url = URL(string: "\(baseURL)/chat/completions") else {
+            throw NetworkError.invalidResponse
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let requestBody = ChatRequest(model: modelId, messages: allMessages)
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(requestBody)
         
-        // 手動でJSONをエンコード/デコード
-        return try await withCheckedThrowingContinuation { continuation in
-            do {
-                let encoder = JSONEncoder()
-                let jsonData = try encoder.encode(requestBody)
-                
-                var request = try URLRequest(url: url, method: .post, headers: headers)
-                request.httpBody = jsonData
-                
-                AF.request(request)
-                    .validate()
-                    .responseData(queue: .global()) { response in
-                        switch response.result {
-                        case .success(let data):
-                            do {
-                                let decoder = JSONDecoder()
-                                let chatResponse = try decoder.decode(ChatResponse.self, from: data)
-                                if let content = chatResponse.choices.first?.message.content {
-                                    continuation.resume(returning: content)
-                                } else {
-                                    continuation.resume(throwing: NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "無効なレスポンス"]))
-                                }
-                            } catch {
-                                continuation.resume(throwing: error)
-                            }
-                        case .failure(let error):
-                            continuation.resume(throwing: error)
-                        }
-                    }
-            } catch {
-                continuation.resume(throwing: error)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+            
+            guard let content = chatResponse.choices.first?.message.content else {
+                throw NetworkError.noData
             }
+            
+            return content
+        } catch {
+            throw NetworkError.decodingError(error)
         }
     }
 }
