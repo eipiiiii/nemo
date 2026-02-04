@@ -58,6 +58,46 @@ struct SettingsView: View {
                     
                     Divider()
                     
+                    // システムプロンプト設定
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("システムプロンプト")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("AIの振る舞いや制約を設定できます")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            TextEditor(text: $viewModel.systemPrompt)
+                                .font(.system(.body, design: .monospaced))
+                                .frame(height: 100)
+                                .padding(4)
+                                .background(Color(nsColor: .textBackgroundColor))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                                .onChange(of: viewModel.systemPrompt) { _, _ in
+                                    viewModel.saveSystemPrompt()
+                                }
+                            
+                            HStack {
+                                Button("デフォルトにリセット") {
+                                    viewModel.systemPrompt = "You are a helpful AI assistant."
+                                    viewModel.saveSystemPrompt()
+                                }
+                                .font(.caption)
+                                Spacer()
+                                Text("\(viewModel.systemPrompt.count) 文字")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
                     // モデル選択
                     VStack(alignment: .leading, spacing: 12) {
                         Text("選択中のモデル")
@@ -126,7 +166,7 @@ struct SettingsView: View {
                 .padding()
             }
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(minWidth: 600, minHeight: 600)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
