@@ -11,7 +11,7 @@ import Combine
 @MainActor
 class SettingsViewModel: ObservableObject {
     @Published var apiKey = ""
-    @Published var systemPrompt = ""
+    @Published var customPrompt = ""
     @Published var models: [Model] = []
     @Published var selectedModelId = ""
     @Published var isLoading = false
@@ -19,7 +19,7 @@ class SettingsViewModel: ObservableObject {
     
     private let service = OpenRouterService()
     private let apiKeyKey = "openrouter_api_key"
-    private let systemPromptKey = "system_prompt"
+    private let customPromptKey = "custom_prompt"
     private let selectedModelKey = "selected_model_id"
     
     init() {
@@ -30,13 +30,13 @@ class SettingsViewModel: ObservableObject {
         UserDefaults.standard.set(apiKey, forKey: apiKeyKey)
     }
     
-    func saveSystemPrompt() {
-        UserDefaults.standard.set(systemPrompt, forKey: systemPromptKey)
+    func saveCustomPrompt() {
+        UserDefaults.standard.set(customPrompt, forKey: customPromptKey)
     }
     
     func loadSettings() {
         apiKey = UserDefaults.standard.string(forKey: apiKeyKey) ?? ""
-        systemPrompt = UserDefaults.standard.string(forKey: systemPromptKey) ?? "You are a helpful AI assistant."
+        customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
     }
     
