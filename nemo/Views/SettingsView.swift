@@ -70,7 +70,7 @@ struct SettingsView: View {
                             
                             TextEditor(text: $viewModel.customPrompt)
                                 .font(.system(.body, design: .default))
-                                .frame(height: 120)
+                                .frame(height: 100)
                                 .padding(8)
                                 .background(Color(nsColor: .textBackgroundColor))
                                 .cornerRadius(8)
@@ -168,7 +168,8 @@ struct SettingsView: View {
                 .padding()
             }
         }
-        .frame(minWidth: 600, minHeight: 600)
+        .frame(width: 500)
+        .fixedSize(horizontal: false, vertical: true)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
@@ -290,8 +291,10 @@ struct ModelSelectionView: View {
                     }
                 }
             }
+            .frame(height: 400)
         }
-        .frame(minWidth: 700, minHeight: 600)
+        .frame(width: 600)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
