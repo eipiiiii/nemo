@@ -21,76 +21,83 @@ struct ChatView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(viewModel.messages) { message in
-                        MessageBubbleView(message: message)
-                            .id(message.id)
-                    }
-                }
-                .padding()
-            }
-            .background(Color(nsColor: .windowBackgroundColor))
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    // エラー表示
-                    if let errorMessage = viewModel.errorMessage {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                            Text(errorMessage)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Button("閉じる") {
-                                viewModel.errorMessage = nil
-                            }
-                            .buttonStyle(.plain)
-                            .font(.caption)
+        ZStack(alignment: .bottom) {
+            // メッセージリスト（画面全体に広がる）
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(viewModel.messages) { message in
+                            MessageBubbleView(message: message)
+                                .id(message.id)
                         }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.1))
-                    }
-                    
-                    // 入力エリア
-                    HStack(alignment: .bottom, spacing: 12) {
-                        TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule()
-                                    .fill(Color(nsColor: .textBackgroundColor))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-                            )
-                            .lineLimit(1...5)
-                            .onSubmit {
-                                viewModel.sendMessage()
-                            }
-                            .disabled(viewModel.isLoading)
                     }
                     .padding()
-                    .background(.regularMaterial)
+                    .padding(.bottom, 60) // 入力バーの高さ分の余白
                 }
-            }
-            .onChange(of: viewModel.messages.count) { _, _ in
-                if let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                .onChange(of: viewModel.messages.count) { _, _ in
+                    if let lastMessage = viewModel.messages.last {
+                        withAnimation {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: viewModel.isLoading) { _, isLoading in
+                    if !isLoading, let lastMessage = viewModel.messages.last {
+                        withAnimation {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
-            .onChange(of: viewModel.isLoading) { _, isLoading in
-                if !isLoading, let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            
+            // 入力エリア（上に重ねる）
+            VStack(spacing: 0) {
+                // エラー表示
+                if let errorMessage = viewModel.errorMessage {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button("閉じる") {
+                            viewModel.errorMessage = nil
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.1))
                 }
+                
+                // 入力バー
+                HStack(alignment: .bottom, spacing: 12) {
+                    TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(Color(nsColor: .textBackgroundColor))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                        )
+                        .lineLimit(1...5)
+                        .onSubmit {
+                            viewModel.sendMessage()
+                        }
+                        .disabled(viewModel.isLoading)
+                }
+                .padding()
+                .background(
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(0.95)
+                        .background(.ultraThinMaterial)
+                )
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
