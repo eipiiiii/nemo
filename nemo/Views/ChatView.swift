@@ -179,12 +179,12 @@ struct MessageBubbleView: View {
     // Seed mock messages for preview
     let conversationId = UUID()
     let messages: [Conversation] = [
-        Conversation(id: UUID(), conversationId: conversationId, role: "user", content: "こんにちは！このアプリはどんなことができますか？", createdAt: Date()),
-        Conversation(id: UUID(), conversationId: conversationId, role: "assistant", content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。", createdAt: Date()),
-        Conversation(id: UUID(), conversationId: conversationId, role: "user", content: "スクロールのテストをしたいので、少し長めのテキストを送ります。スクロール位置が下に追従するか確認してください。", createdAt: Date()),
-        Conversation(id: UUID(), conversationId: conversationId, role: "assistant", content: "了解しました。以下はダミーテキストです。\n\nSwiftUI は宣言的な UI フレームワークで、ビューの状態に応じて UI を構築します。スクロールやレイアウトの挙動は、`ScrollView` や `LazyVStack` を組み合わせることで柔軟に表現できます。長文を表示することで、下部へのオートスクロールや表示の最適化を確認できます。さらにコードブロックや Markdown の表現も組み込めます。\n\n```swift\nstruct ExampleView: View {\n    var body: some View {\n        ScrollView {\n            Text(\"Hello\")\n        }\n    }\n}\n```\n\nこのように長文とコードを混在させて、見え方を確認してください。", createdAt: Date()),
-        Conversation(id: UUID(), conversationId: conversationId, role: "user", content: "ありがとうございます！もう少しメッセージを追加しておきます。", createdAt: Date()),
-        Conversation(id: UUID(), conversationId: conversationId, role: "assistant", content: "はい、十分な件数のメッセージがあるとスクロールのテストがしやすくなります。必要に応じてさらに増やしてください。", createdAt: Date())
+        Conversation(id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "assistant", content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "user", content: "スクロールのテストをしたいので、少し長めのテキストを送ります。スクロール位置が下に追従するか確認してください。", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "assistant", content: "了解しました。以下はダミーテキストです。\n\nSwiftUI は宣言的な UI フレームワークで、ビューの状態に応じて UI を構築します。スクロールやレイアウトの挙動は、`ScrollView` や `LazyVStack` を組み合わせることで柔軟に表現できます。長文を表示することで、下部へのオートスクロールや表示の最適化を確認できます。さらにコードブロックや Markdown の表現も組み込めます。\n\n```swift\nstruct ExampleView: View {\n    var body: some View {\n        ScrollView {\n            Text(\"Hello\")\n        }\n    }\n}\n```\n\nこのように長文とコードを混在させて、見え方を確認してください。", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "user", content: "ありがとうございます！もう少しメッセージを追加しておきます。", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "assistant", content: "はい、十分な件数のメッセージがあるとスクロールのテストがしやすくなります。必要に応じてさらに増やしてください。", timestamp: Date(), conversationId: conversationId)
     ]
 
     messages.forEach { context.insert($0) }
