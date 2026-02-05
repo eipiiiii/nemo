@@ -187,7 +187,7 @@ struct MessageBubbleView: View {
         Conversation(id: UUID(), conversationId: conversationId, role: "assistant", content: "はい、十分な件数のメッセージがあるとスクロールのテストがしやすくなります。必要に応じてさらに増やしてください。", createdAt: Date())
     ]
 
-    for m in messages { context.insert(m) }
+    messages.forEach { context.insert($0) }
     _ = try? context.save()
 
     ChatView(conversationId: conversationId, modelContext: context)
