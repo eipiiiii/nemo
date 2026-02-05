@@ -13,6 +13,7 @@ struct ChatView: View {
     let conversationId: UUID
     let modelContext: ModelContext
     @StateObject private var viewModel: ChatViewModel
+    @FocusState private var isInputFocused: Bool
     
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
@@ -70,7 +71,7 @@ struct ChatView: View {
                 .allowsHitTesting(false)
             }
             
-            // 入力エリア(下部に重ねる)
+            // 入力エリア(Liquid Glass効果付き)
             VStack(alignment: .leading, spacing: 0) {
                 // エラー表示
                 if let errorMessage = viewModel.errorMessage {
@@ -92,31 +93,80 @@ struct ChatView: View {
                     .background(Color.orange.opacity(0.1))
                 }
                 
-                // 入力フィールド(グラス効果付き)
+                // Liquid Glass入力フィールド
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                         .textFieldStyle(.plain)
+                        .focused($isInputFocused)
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(Color(nsColor: .textBackgroundColor).opacity(0.7))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-                        )
-                        .background(
-                            Capsule()
-                                .fill(Material.thin)
-                        )
+                        .padding(.vertical, 12)
                         .lineLimit(1...5)
+                        .background {
+                            ZStack {
+                                // ベースのガラスマテリアル
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                
+                                // レンズ効果（内側のハイライト）
+                                Capsule()
+                                    .stroke(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                .white.opacity(isInputFocused ? 0.4 : 0.2),
+                                                .white.opacity(0.0),
+                                                .white.opacity(isInputFocused ? 0.1 : 0.05)
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                                    .padding(0.5)
+                                
+                                // フォーカス時の発光効果
+                                if isInputFocused {
+                                    Capsule()
+                                        .stroke(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    .blue.opacity(0.3),
+                                                    .cyan.opacity(0.2),
+                                                    .blue.opacity(0.3)
+                                                ]),
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            ),
+                                            lineWidth: 2
+                                        )
+                                        .shadow(color: .blue.opacity(0.4), radius: 12, x: 0, y: 0)
+                                        .shadow(color: .cyan.opacity(0.3), radius: 8, x: 0, y: 0)
+                                        .transition(.opacity)
+                                }
+                                
+                                // 微細なボーダー
+                                Capsule()
+                                    .strokeBorder(
+                                        .white.opacity(0.15),
+                                        lineWidth: 0.5
+                                    )
+                            }
+                        }
                         .onSubmit {
                             viewModel.sendMessage()
                         }
                         .disabled(viewModel.isLoading)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background {
+                    // バックグラウンドの薄いガラス効果
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
+                        .ignoresSafeArea(edges: .bottom)
+                }
             }
         }
         .id(conversationId)
