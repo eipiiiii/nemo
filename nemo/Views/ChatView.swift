@@ -70,7 +70,7 @@ struct ChatView: View {
                 .allowsHitTesting(false)
             }
             
-            // 入力エリア（下部に重ねる）
+            // 入力エリア(下部に重ねる)
             VStack(alignment: .leading, spacing: 0) {
                 // エラー表示
                 if let errorMessage = viewModel.errorMessage {
@@ -92,7 +92,7 @@ struct ChatView: View {
                     .background(Color.orange.opacity(0.1))
                 }
                 
-                // 入力フィールド（グラス効果付き）
+                // 入力フィールド(グラス効果付き)
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                         .textFieldStyle(.plain)
