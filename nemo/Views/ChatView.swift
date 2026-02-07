@@ -37,7 +37,7 @@ struct ChatView: View {
                             }
                         }
                         .padding()
-                        .padding(.bottom, 120)
+                        .padding(.bottom, 60)
                     }
                     .onChange(of: viewModel.messages.count) { _, _ in
                         if let lastMessage = viewModel.messages.last {
@@ -68,7 +68,6 @@ struct ChatView: View {
                     endPoint: .bottom
                 )
                 .frame(height: 100)
-                .allowsHitTesting(false)
             }
             
             // 入力エリア(Liquid Glass効果付き)
@@ -85,7 +84,6 @@ struct ChatView: View {
                         Button("閉じる") {
                             viewModel.errorMessage = nil
                         }
-                        .buttonStyle(.plain)
                         .font(.caption)
                     }
                     .padding(.horizontal)
@@ -99,77 +97,18 @@ struct ChatView: View {
                         .textFieldStyle(.plain)
                         .focused($isInputFocused)
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .lineLimit(1...5)
-                        .background {
-                            ZStack {
-                                // ベースのガラスマテリアル
-                                Capsule()
-                                    .fill(.regularMaterial)
-                                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                                
-                                // レンズ効果（内側のハイライト）
-                                Capsule()
-                                    .stroke(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [
-                                                .white.opacity(isInputFocused ? 0.4 : 0.2),
-                                                .white.opacity(0.0),
-                                                .white.opacity(isInputFocused ? 0.1 : 0.05)
-                                            ]),
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1.5
-                                    )
-                                    .padding(0.5)
-                                
-                                // フォーカス時の発光効果
-                                if isInputFocused {
-                                    Capsule()
-                                        .stroke(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    .blue.opacity(0.3),
-                                                    .cyan.opacity(0.2),
-                                                    .blue.opacity(0.3)
-                                                ]),
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            ),
-                                            lineWidth: 2
-                                        )
-                                        .shadow(color: .blue.opacity(0.4), radius: 12, x: 0, y: 0)
-                                        .shadow(color: .cyan.opacity(0.3), radius: 8, x: 0, y: 0)
-                                        .transition(.opacity)
-                                }
-                                
-                                // 微細なボーダー
-                                Capsule()
-                                    .strokeBorder(
-                                        .white.opacity(0.15),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                        }
+                        .padding(.vertical, 8)
+                        .glassEffect(.clear, in: .capsule)
                         .onSubmit {
                             viewModel.sendMessage()
                         }
                         .disabled(viewModel.isLoading)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isInputFocused)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background {
-                    // バックグラウンドの薄いガラス効果
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-                        .ignoresSafeArea(edges: .bottom)
-                }
             }
         }
-        .id(conversationId)
+//        .id(conversationId)
     }
 }
 
@@ -188,29 +127,28 @@ struct MessageBubbleView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(Color.blue)
-                        .foregroundColor(.white)
                         .cornerRadius(18)
                 } else {
                     Markdown(message.content)
-                        .markdownTheme(.gitHub)
+                        .markdownTheme(.appleStyle)
                         .markdownTextStyle {
+                            Font(.body)
                             ForegroundColor(.primary)
-                            FontSize(14)
                         }
                         .markdownBlockStyle(\.codeBlock) { configuration in
                             configuration.label
                                 .padding()
-                                .background(Color(nsColor: .textBackgroundColor))
+                                .background(Color(nsColor: .quaternary))
                                 .cornerRadius(8)
                                 .markdownTextStyle {
-                                    FontFamilyVariant(.monospaced)
-                                    FontSize(13)
+                                    Font(.system(size: 15, design: .monospaced))
+                                    ForegroundColor(.secondary)
                                 }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .cornerRadius(18)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(nsColor: .tertiary).opacity(0.1))
+                        .cornerRadius(20)
                 }
             }
             
@@ -218,6 +156,41 @@ struct MessageBubbleView: View {
                 Spacer(minLength: 60)
             }
         }
+    }
+}
+
+extension Theme {
+  static let appleStyle = Theme()
+    .text {
+      Font(.body)  // Apple標準本文サイズ
+      ForegroundColor(.primary)
+    }
+    .code {
+      Font(.system(size: 15, design: .monospaced))  // コード用サイズ
+      ForegroundColor(.secondary)
+      BackgroundColor(Color(nsColor: .quaternary))
+    }
+    .link {
+      Font(.body)
+      ForegroundColor(.blue)
+      UnderlineStyle(.single)
+    }
+    .paragraph {
+      RelativeLineSpacing(.em(0.1))
+      MarkdownMargin(top: 8, bottom: 8)
+    }
+    .blockquote {
+      Padding(12)
+      ForegroundColor(.secondary)
+      BackgroundColor(Color(nsColor: .tertiary).opacity(0.1))
+      Overlay {
+        Rectangle()
+          .Fill(Color(nsColor: .secondary).opacity(0.3))
+          .Frame(width: 4)
+      }
+    }
+    .listItem {
+      MarkdownMargin(top: 4, bottom: 4)
     }
 }
 
@@ -232,7 +205,7 @@ struct MessageBubbleView: View {
         Conversation(id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(), conversationId: conversationId),
         Conversation(id: UUID(), role: "assistant", content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。", timestamp: Date(), conversationId: conversationId),
         Conversation(id: UUID(), role: "user", content: "スクロールのテストをしたいので、少し長めのテキストを送ります。スクロール位置が下に追従するか確認してください。", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "assistant", content: "了解しました。以下はダミーテキストです。\n\nSwiftUI は宣言的な UI フレームワークで、ビューの状態に応じて UI を構築します。スクロールやレイアウトの挙動は、`ScrollView` や `LazyVStack` を組み合わせることで柔軟に表現できます。長文を表示することで、下部へのオートスクロールや表示の最適化を確認できます。さらにコードブロックや Markdown の表現も組み込めます。\n\n```swift\nstruct ExampleView: View {\n    var body: some View {\n        ScrollView {\n            Text(\"Hello\")\n        }\n    }\n}\n```\n\nこのように長文とコードを混在させて、見え方を確認してください。", timestamp: Date(), conversationId: conversationId),
+        Conversation(id: UUID(), role: "assistant", content: "了解しました。以下はダミーテキストです。\n\nSwiftUI は宣言的な UI フレームワークで、ビューの状態に応じて UI を構築します。スクロールやレイアウトの挙動は、`ScrollView` や `LazyVStack` を組み合わせることで柔軟に表現できます。長文を表示することで、下部へのオートスクロールや表示の最適化を確認できます。さらにコードブロックや Markdown の表現も組み込めます。このように長文とコードを混在させて、見え方を確認してください。", timestamp: Date(), conversationId: conversationId),
         Conversation(id: UUID(), role: "user", content: "ありがとうございます！もう少しメッセージを追加しておきます。", timestamp: Date(), conversationId: conversationId),
         Conversation(id: UUID(), role: "assistant", content: "はい、十分な件数のメッセージがあるとスクロールのテストがしやすくなります。必要に応じてさらに増やしてください。", timestamp: Date(), conversationId: conversationId)
     ]
