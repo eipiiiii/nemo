@@ -1,0 +1,232 @@
+@startuml
+!theme plain
+skinparam defaultFontSize 12
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+title nemo - Class Diagram (MVVM)
+
+' ===== View Layer =====
+package "Views" {
+    struct ContentView <<SwiftUI.View>> {
+        - modelContext: ModelContext <<@Environment>>
+        - conversations: [Conversation] <<@Query>>
+        - viewModel: ConversationListViewModel <<@StateObject>>
+        --
+        + body: some View
+    }
+
+    struct ChatView <<SwiftUI.View>> {
+        - conversationId: UUID
+        - modelContext: ModelContext
+        - viewModel: ChatViewModel <<@StateObject>>
+        - isInputFocused: Bool <<@FocusState>>
+        --
+        + body: some View
+    }
+
+    struct MessageBubbleView <<SwiftUI.View>> {
+        - message: Conversation
+        --
+        + body: some View
+    }
+
+    struct SettingsView <<SwiftUI.View>> {
+        - viewModel: SettingsViewModel <<@StateObject>>
+        - showingModelSelection: Bool
+        --
+        + body: some View
+    }
+
+    struct ModelSelectionView <<SwiftUI.View>> {
+        - viewModel: SettingsViewModel <<@ObservedObject>>
+        - searchText: String
+        --
+        + body: some View
+        + filteredModels: [Model]
+    }
+}
+
+' ===== ViewModel Layer =====
+package "ViewModels" {
+
+    class ConversationListViewModel <<@MainActor, ObservableObject>> {
+        --
+        + selectedConversationId: UUID? <<@Published>>
+        + showingSettings: Bool <<@Published>>
+        + columnVisibility: NavigationSplitViewVisibility <<@Published>>
+        --
+        + init()
+        + createNewConversation(in:) -> UUID
+        + deleteConversation(conversationId:in:from:)
+        + deleteConversations(at:in:from:)
+        + buildConversationTitles(from:) -> [(UUID, String, Date)]
+    }
+
+    class ChatViewModel <<@MainActor, ObservableObject>> {
+        - conversationId: UUID
+        - model: ModelContext
+        - service: OpenRouterService
+        --
+        + messageText: String <<@Published>>
+        + messages: [Conversation] <<@Published>>
+        + isLoading: Bool <<@Published>>
+        + errorMessage: String? <<@Published>>
+        + selectedModelId: String <<@Published>>
+        --
+        + loadMessages()
+        + loadSelectedModel()
+        + sendMessage()
+    }
+
+    class SettingsViewModel <<@MainActor, ObservableObject>> {
+        - service: OpenRouterService
+        - apiKeyKey: String
+        - customPromptKey: String
+        - selectedModelKey: String
+        --
+        + apiKey: String <<@Published>>
+        + customPrompt: String <<@Published>>
+        + models: [Model] <<@Published>>
+        + selectedModelId: String <<@Published>>
+        + isLoading: Bool <<@Published>>
+        + errorMessage: String? <<@Published>>
+        --
+        + saveApiKey()
+        + saveCustomPrompt()
+        + loadSettings()
+        + selectModel(_:)
+        + fetchModels()
+    }
+}
+
+' ===== Model Layer =====
+package "Models" {
+
+    class Conversation <<@Model>> {
+        - id: UUID
+        - role: String
+        - content: String
+        - timestamp: Date
+        - conversationId: UUID
+        --
+        + init(id:role:content:timestamp:conversationId:)
+    }
+
+    struct Model <<Codable, Identifiable, Sendable>> {
+        - id: String
+        - name: String
+        - description: String?
+        - contextLength: Int?
+        - pricing: Pricing
+        - topProvider: TopProvider
+        - architecture: Architecture
+    }
+
+    struct Pricing <<Codable, Sendable>> {
+        - prompt: String? <<optional>>
+        - completion: String? <<optional>>
+        - request: String? <<optional>>
+        - image: String? <<optional>>
+    }
+
+    struct TopProvider <<Codable, Sendable>> {
+        - contextLength: Int?
+        - maxCompletionTokens: Int?
+        - isModerated: Bool?
+    }
+
+    struct Architecture <<Codable, Sendable>> {
+        - modality: String?
+        - tokenizer: String?
+        - instructType: String?
+    }
+}
+
+' ===== Service Layer =====
+package "Services" {
+
+    class OpenRouterService <<Sendable>> {
+        - baseURL: String
+        - apiKeyKey: String
+        - customPromptKey: String
+        - systemPrompt: String
+        --
+        + getModels() async throws -> [Model]
+        + sendMessage(messages:modelId:) async throws -> String
+    }
+
+    struct ModelsResponse <<Codable, Sendable>> {
+        - data: [Model]
+    }
+
+    struct ChatRequest <<Codable, Sendable>> {
+        - model: String
+        - messages: [[String: String]]
+    }
+
+    struct ChatResponse <<Codable, Sendable>> {
+        - choices: [Choice]
+    }
+
+    struct Choice <<Codable, Sendable>> {
+        - message: Message
+    }
+
+    struct Message <<Codable, Sendable>> {
+        - content: String
+    }
+
+    enum NetworkError <<LocalizedError>> {
+        - invalidResponse
+        - httpError: Int
+        - noData
+        - decodingError: Error
+        --
+        + errorDescription: String?
+    }
+}
+
+' ===== Dependencies =====
+
+ContentView --> ConversationListViewModel : @StateObject
+ContentView --> ChatView : uses
+ContentView --> SettingsView : uses (sheet)
+ContentView *--> Conversation : @Query
+ChatView *--> ChatViewModel : @StateObject
+MessageBubbleView --> Conversation : displays
+SettingsView *--> SettingsViewModel : @StateObject
+ModelSelectionView --> SettingsViewModel : @ObservedObject
+ConversationListViewModel --> Conversation : manages
+ChatViewModel --> OpenRouterService : uses
+SettingsViewModel --> OpenRouterService : uses
+SettingsViewModel --> Model : displays
+ChatViewModel --> Conversation : manages
+
+note right of ConversationListViewModel
+  @MainActor + ObservableObject:
+  - 会話リストの状態管理
+  - ナビゲーション制御
+  - SwiftDataへの書き込みを担当
+end note
+
+note right of ChatViewModel
+  @MainActor:
+  - 単一会話内のメッセージ管理
+  - API通信を担当
+end note
+
+note right of SettingsViewModel
+  - API設定の管理
+  - OpenRouterからモデル取得
+  - UserDefaultsに保存
+end note
+
+note bottom of OpenRouterService
+  nonisolated functions:
+  - getModels()
+  - sendMessage()
+  Thread-safe via Sendable
+end note
+
+@enduml

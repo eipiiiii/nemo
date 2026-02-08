@@ -11,33 +11,20 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var conversations: [Conversation]
-    @State private var selectedConversationId: UUID?
-    @State private var showingSettings = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @StateObject private var viewModel = ConversationListViewModel()
     
-    var conversationGroups: [UUID: [Conversation]] {
-        Dictionary(grouping: conversations, by: { $0.conversationId })
-    }
-    
-    var conversationTitles: [(UUID, String, Date)] {
-        conversationGroups.map { conversationId, convs in
-            let title = convs.first(where: { $0.role == "user" })?.content.prefix(30).description ?? "新しい会話"
-            let date = convs.last?.timestamp ?? Date()
-            return (conversationId, String(title), date)
-        }.sorted { $0.2 > $1.2 }
-    }
-
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView(columnVisibility: $viewModel.columnVisibility) {
             // サイドバー
-            List(selection: $selectedConversationId) {
-                ForEach(conversationTitles, id: \.0) { conversationId, title, date in
+            List(selection: $viewModel.selectedConversationId) {
+                ForEach(viewModel.buildConversationTitles(from: conversations), id: \.0) { conversationId, title, date in
                     NavigationLink(value: conversationId) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(title)
                                 .font(.headline)
                                 .lineLimit(1)
-                            if let lastMessage = conversationGroups[conversationId]?.last {
+                            if let group = Dictionary(grouping: conversations, by: { $0.conversationId })[conversationId],
+                               let lastMessage = group.last {
                                 Text(lastMessage.content)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -48,11 +35,13 @@ struct ContentView: View {
                     }
                     .contextMenu {
                         Button("削除", role: .destructive) {
-                            deleteConversation(conversationId: conversationId)
+                            viewModel.deleteConversation(conversationId: conversationId, in: modelContext, from: conversations)
                         }
                     }
                 }
-                .onDelete(perform: deleteConversations)
+                .onDelete { offsets in
+                    viewModel.deleteConversations(at: offsets, in: modelContext, from: conversations)
+                }
             }
             .navigationTitle("会話")
             .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
@@ -60,20 +49,22 @@ struct ContentView: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: createNewConversation) {
+                    Button(action: {
+                        _ = viewModel.createNewConversation(in: modelContext)
+                    }) {
                         Image(systemName: "square.and.pencil")
                     }
                     .help("新しい会話")
                 }
                 ToolbarItem(placement: .navigation) {
-                    Button(action: { showingSettings = true }) {
+                    Button(action: { viewModel.showingSettings = true }) {
                         Image(systemName: "gear")
                     }
                     .help("設定")
                 }
             }
         } detail: {
-            if let selectedId = selectedConversationId {
+            if let selectedId = viewModel.selectedConversationId {
                 ChatView(conversationId: selectedId, modelContext: modelContext)
                     .id(selectedId)
             } else {
@@ -84,7 +75,9 @@ struct ContentView: View {
                     Text("会話を選択するか、新しい会話を開始してください")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    Button(action: createNewConversation) {
+                    Button(action: {
+                        _ = viewModel.createNewConversation(in: modelContext)
+                    }) {
                         Label("新しい会話", systemImage: "square.and.pencil")
                     }
                     .buttonStyle(.bordered)
@@ -93,31 +86,9 @@ struct ContentView: View {
                 .background(Color(nsColor: .windowBackgroundColor))
             }
         }
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $viewModel.showingSettings) {
             SettingsView()
                 .frame(minWidth: 600, minHeight: 500)
-        }
-    }
-    
-    private func createNewConversation() {
-        let conversationId = UUID()
-        selectedConversationId = conversationId
-    }
-    
-    private func deleteConversation(conversationId: UUID) {
-        let conversationsToDelete = conversations.filter { $0.conversationId == conversationId }
-        for conversation in conversationsToDelete {
-            modelContext.delete(conversation)
-        }
-        if selectedConversationId == conversationId {
-            selectedConversationId = nil
-        }
-    }
-    
-    private func deleteConversations(at offsets: IndexSet) {
-        for index in offsets {
-            let conversationId = conversationTitles[index].0
-            deleteConversation(conversationId: conversationId)
         }
     }
 }

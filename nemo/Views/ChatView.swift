@@ -130,25 +130,17 @@ struct MessageBubbleView: View {
                         .cornerRadius(18)
                 } else {
                     Markdown(message.content)
-                        .markdownTheme(.appleStyle)
-                        .markdownTextStyle {
-                            Font(.body)
-                            ForegroundColor(.primary)
-                        }
-                        .markdownBlockStyle(\.codeBlock) { configuration in
-                            configuration.label
-                                .padding()
-                                .background(Color(nsColor: .quaternary))
-                                .cornerRadius(8)
-                                .markdownTextStyle {
-                                    Font(.system(size: 15, design: .monospaced))
-                                    ForegroundColor(.secondary)
-                                }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(nsColor: .tertiary).opacity(0.1))
-                        .cornerRadius(20)
+                        .markdownTheme(
+                            .gitHub
+                            .text {
+                                FontSize(13)
+                                ForegroundColor(.primary)
+                            }
+                        )
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
                 }
             }
             
@@ -156,41 +148,6 @@ struct MessageBubbleView: View {
                 Spacer(minLength: 60)
             }
         }
-    }
-}
-
-extension Theme {
-  static let appleStyle = Theme()
-    .text {
-      Font(.body)  // Apple標準本文サイズ
-      ForegroundColor(.primary)
-    }
-    .code {
-      Font(.system(size: 15, design: .monospaced))  // コード用サイズ
-      ForegroundColor(.secondary)
-      BackgroundColor(Color(nsColor: .quaternary))
-    }
-    .link {
-      Font(.body)
-      ForegroundColor(.blue)
-      UnderlineStyle(.single)
-    }
-    .paragraph {
-      RelativeLineSpacing(.em(0.1))
-      MarkdownMargin(top: 8, bottom: 8)
-    }
-    .blockquote {
-      Padding(12)
-      ForegroundColor(.secondary)
-      BackgroundColor(Color(nsColor: .tertiary).opacity(0.1))
-      Overlay {
-        Rectangle()
-          .Fill(Color(nsColor: .secondary).opacity(0.3))
-          .Frame(width: 4)
-      }
-    }
-    .listItem {
-      MarkdownMargin(top: 4, bottom: 4)
     }
 }
 

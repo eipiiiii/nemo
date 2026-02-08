@@ -1,0 +1,134 @@
+@startuml
+!theme plain
+skinparam defaultFontSize 12
+skinparam stateBackgroundColor #LightBlue
+skinparam stateBorderColor #DarkBlue
+
+title nemo - State Diagram (Chat Flow)
+
+' ===== Chat Screen State Machine =====
+state ChatState <<fork>> {
+
+    [*] --> Idle : アプリ起動\nconversationId設定
+
+    state Idle {
+        [*] --> Ready
+        Ready : 入力可能\n(isLoading == false)
+    }
+
+    state Loading {
+        [*] --> APIRequest
+        APIRequest : メッセージ送信中\n(isLoading == true)
+
+        APIRequest --> AwaitingResponse : API応答待ち
+        AwaitingResponse : ローディング表示
+    }
+
+    state Success {
+        [*] --> DisplayingResponse
+        DisplayingResponse : AI応答表示完了\n(isLoading == false)
+    }
+
+    state Error {
+        [*] --> ValidationError
+        ValidationError : 入力エラー\n(errorMessage設定)
+
+        ValidationError --> Ready : エラー閉じる
+
+        [*] --> NetworkError
+        NetworkError : 通信エラー\n(errorMessage設定)
+
+        NetworkError --> Ready : リトライ\n再送信
+    }
+}
+
+' ===== State Transitions =====
+
+' Idle -> Loading transitions
+Ready --> APIRequest : sendMessage()\n(入力あり & モデル選択済み)
+
+Ready --> ValidationError : sendMessage()\n(モデル未選択)
+
+APIRequest : onSubmit / TextField入力
+APIRequest : isLoading = true
+
+' Loading -> Success
+AwaitingResponse --> DisplayingResponse : API成功\n(response受信)
+
+DisplayingResponse : messages更新\n(assistant追加)
+DisplayingResponse : isLoading = false
+
+' Loading -> Error
+AwaitingResponse --> NetworkError : API失敗\n(error発生)
+
+NetworkError : errorMessage設定
+
+' Error -> Ready transitions
+ValidationError -[#Orange]-> Ready : 閉じるボタン押下
+
+NetworkError -[#Orange]-> Ready : 設定変更
+
+' Success -> Idle (new message)
+DisplayingResponse --> Ready : 次のメッセージ入力
+
+' ===== Settings Screen State Machine =====
+state SettingsState <<fork>> {
+
+    [*] --> SettingsIdle
+
+    state SettingsIdle {
+        [*] --> APIKeyEntered
+        APIKeyEntered : APIキー入力済
+    }
+
+    state LoadingModels {
+        [*] --> FetchingModels
+        FetchingModels : モデル取得中\n(isLoading == true)
+    }
+
+    state ModelsLoaded {
+        [*] --> ModelListReady
+        ModelListReady : モデル一覧表示
+    }
+
+    state SelectionMode {
+        [*] --> ModelSelected
+        ModelSelected : モデル選択済
+    }
+
+    state ErrorState {
+        [*] --> SettingsError
+        SettingsError : エラー表示
+    }
+}
+
+' Settings transitions
+APIKeyEntered --> FetchingModels : fetchModels()\n(APIキーあり)
+
+FetchingModels --> ModelListReady : API成功\n(models取得)
+
+FetchingModels --> SettingsError : API失敗
+
+ModelListReady --> ModelSelected : モデル選択\n(selectModel)
+
+ModelSelected --> ModelListReady : 変更ボタン押下
+
+SettingsError --> APIKeyEntered : エラー閉じる
+
+note right of ChatState
+  主要トリガー:
+  - onAppear: メッセージ読み込み
+  - onSubmit: メッセージ送信
+  - onChange: 状態変化検出
+  - Button Tap: エラー閉じる
+end note
+
+note bottom of SettingsState
+  設定変更の流れ:
+  1. APIキー入力 -> saveApiKey()
+  2. モデル一覧取得 -> fetchModels()
+  3. モデル選択 -> selectModel()
+  4. 設定永続化 -> UserDefaults
+end note
+
+@enduml

@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:nemo}",
+            "name": "Debug nemo",
+            "target": "nemo",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug nemo"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:nemo}",
+            "name": "Release nemo",
+            "target": "nemo",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release nemo"
+        }
+    ]
+}

@@ -1,0 +1,97 @@
+@startuml
+!theme plain
+skinparam defaultFontSize 11
+skinparam sequenceParticipantBackgroundColor #LightYellow
+skinparam sequenceActorBackgroundColor #LightBlue
+skinparam sequenceLifeLineBackgroundColor #LightGreen
+
+title nemo - Sequence Diagram (Message Send Flow)
+
+actor User
+participant "ChatView\n(SwiftUI View)" as View
+participant "ChatViewModel\n(@MainActor)" as VM
+participant "ModelContext\n(SwiftData)" as Context
+participant "OpenRouterService" as Service
+participant "OpenRouter API" as API
+
+' === メッセージ送信フロー ===
+group メッセージ送信フロー
+    User ->> View : メッセージ入力 [TextField]
+    View ->> VM : messageText 更新 [@Binding]
+
+    User ->> View : Sendボタン押下 [onSubmit]
+
+    View ->> VM : sendMessage()
+
+    alt 入力OK
+        VM ->> Context : insert(userMessage)
+        VM ->> VM : messages.append(userMessage)
+        VM ->> VM : messageText = ""
+        VM ->> VM : isLoading = true
+
+        VM ->> Service : sendMessage(messages:, modelId:)
+        Service ->> API : POST /chat/completions
+        API --> Service : ChatResponse
+        Service --> VM : responseText
+
+        VM ->> Context : insert(assistantMessage)
+        VM ->> VM : messages.append(assistantMessage)
+        VM ->> VM : isLoading = false
+
+        VM --> View : UI更新
+        View ->> User : 応答表示
+    else 入力エラー
+        VM --> View : errorMessage設定
+        View --> User : エラー表示
+    end
+end
+
+' === 初期化フロー ===
+group 初期化フロー
+    User ->> View : 画面表示
+    View ->> VM : ChatViewModel初期化 [@StateObject]
+
+    VM ->> Context : FetchDescriptor [SwiftData]
+    Context --> VM : messages[]
+    VM ->> VM : messages = fetched [@Published]
+
+    VM ->> VM : loadSelectedModel()
+    VM ->> VM : UserDefaults取得
+end
+
+' === 設定変更フロー ===
+group 設定変更フロー
+    User ->> View : Settingsボタン押下 [Toolbar]
+    View ->> SettingsView : sheet表示
+
+    SettingsView ->> SettingsVM : StateObject初期化
+    SettingsVM ->> SettingsVM : loadSettings()
+
+    User ->> SettingsView : APIキー入力
+    SettingsView ->> SettingsVM : apiKey更新
+    SettingsVM ->> SettingsVM : saveApiKey()
+
+    User ->> SettingsView : モデル一覧取得
+    SettingsVM ->> Service : getModels()
+    Service ->> API : GET /models
+    API --> Service : ModelsResponse
+    Service --> SettingsVM : [Model]
+
+    User ->> SettingsView : モデル選択
+    SettingsView ->> SettingsVM : selectModel(model)
+    SettingsVM ->> SettingsVM : UserDefaults保存
+end
+
+note right of VM
+  @MainActor:
+  - UI更新はメインスレッド
+  - async/awaitで自動スケジューリング
+end note
+
+note right of Service
+  nonisolated:
+  - Thread-safe
+  - sendMessage() / getModels()
+end note
+
+@enduml

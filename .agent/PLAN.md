@@ -1,151 +1,120 @@
-# プロジェクト計画: AI対話アプリ
-
-**Status**: Draft
+# プロジェクト計画: ContentViewのリファクタリング
+**Status**: Completed
 
 ## 1. 目的と背景 (Goal & Context)
-- **何を作るのか？**: SwiftUIで構築されたシンプルでロバストなAI対話アプリ。OpenRouter APIを使用して複数のAIモデルと対話できる。
-- **なぜ作るのか？**: ユーザーが無料・有料のAIモデルと簡単にやり取りできるアプリを提供するため。
-- **成功の定義（完了条件）**:
-  - ユーザーがテキストを入力し、AIからの返答を受け取れること。
-  - 会話履歴が保存され、アプリ再起動後も保持されること。
-  - エラーが発生した場合、詳細なエラーメッセージがアラートで表示されること。
+SwiftUIのベストプラクティスに従い、ContentViewに書かれているビジネスロジックをViewModelに移行する。
+
+**問題点**:
+- ContentViewがSwiftDataのビジネスロジックを直接持っている
+- Viewのテストが困難
+- 単一責任原則 위반
+
+**成功の定義**:
+- ContentViewが「見た目」onlyになる
+- ConversationListViewModelが会話リストの管理を担当する
 
 ## 2. 要件定義 (Requirements)
-
-### 機能要件
-- ユーザーがテキストを入力し、送信ボタンまたはEnterキーでAIに送信できる。
-- AIからの返答を受信し、画面に表示する。
-- 送信中はローディングインジケータを表示する。
-- 会話履歴（ユーザー入力とAI返答）をローカルに保存し、再起動後も保持する。
-- エラーが発生した場合はアラートで詳細を通知する。
-
-### 非機能要件
-- プライバシー: 送信内容はローカルに保存し、会話履歴として保持する。
-- ロバスト性: ネットワークエラー、APIキーの無効、レートリミットなどに対応したエラー処理。
-- パフォーマンス: ローディング状態を適切に表示し、ユーザー体験を向上させる。
+- **機能要件**:
+  - 会話リストの作成・削除機能が引き続き動作する
+  - 会話のグループ化とタイトル表示が動作する
+- **非機能要件**:
+  - SwiftUI + SwiftData のベストプラクティスに従う
+  - 既存のテストが動作する
 
 ## 3. 基本設計 (Architecture & Design)
 
 ### 技術スタック
-- **言語**: Swift
-- **UIフレームワーク**: SwiftUI
-- **データ永続化**: SwiftData
-- **HTTP通信**: Alamofire
-- **AI API**: OpenRouter
-- **APIキー管理**: UserDefaults
+- 言語: Swift
+- FW: SwiftUI + SwiftData
+- パターン: MVVM（ハイブリッド型）
+
+### 重要: SwiftDataとSwiftUIの制約
+1. **`@Query`はSwiftUI View内でのみ動作する** - Viewに残す（データの読み出し・監視）
+2. **`@Environment`の初期化タイミング問題** - ViewModelのinit時点でEnvironmentの値にアクセスできないため、modelContextは保持せずメソッド引数で渡す
 
 ### ディレクトリ構成案
 ```
 nemo/
-├── Models/
-│   ├── Conversation.swift      # 会話履歴のデータモデル
-│   └── Model.swift             # OpenRouterモデル情報のデータモデル
-├── ViewModels/
-│   ├── ChatViewModel.swift     # AI通信と会話管理のロジック
-│   └── SettingsViewModel.swift # 設定画面のロジック
-├── Views/
-│   ├── ChatView.swift          # チャット画面（既存）
-│   ├── SettingsView.swift      # 設定画面
-│   └── ModelSelectionView.swift # モデル選択画面
-├── Services/
-│   └── OpenRouterService.swift # OpenRouter APIとの通信
-└── Resources/
-    └── ApiKeys.plist          # APIキーの設定ファイル
+  ViewModels/
+    ChatViewModel.swift              (既存 - 単一会話内メッセージ管理)
+    ConversationListViewModel.swift  (新規作成 - 会話リスト管理)
 ```
 
-### データ設計
-- **Conversation**: 会話1件を表すモデル
-  - id: UUID
-  - role: String (user / assistant)
-  - content: String
-  - timestamp: Date
-  - conversationId: UUID (会話のグループを識別)
-
-### 外部連携
-- **OpenRouter API**: テキストを送信し、AIの返答を受信する。
-- **APIキー**: UserDefaultsに保存し、アプリ起動時に読み込む。
+### ConversationListViewModelの設計
+```swift
+@MainActor
+class ConversationListViewModel: ObservableObject {
+    // ナビゲーション状態
+    @Published var selectedConversationId: UUID?
+    @Published var showingSettings: Bool = false
+    
+    init() {}
+    
+    // MARK: - Actions (Write)
+    // modelContextを引数で受け取る
+    
+    func createNewConversation(in context: ModelContext) -> UUID {
+        let conversationId = UUID()
+        selectedConversationId = conversationId
+        return conversationId
+    }
+    
+    func deleteConversation(conversationId: UUID, in context: ModelContext, from conversations: [Conversation]) {
+        let conversationsToDelete = conversations.filter { $0.conversationId == conversationId }
+        for conversation in conversationsToDelete {
+            context.delete(conversation)
+        }
+        if selectedConversationId == conversationId {
+            selectedConversationId = nil
+        }
+    }
+    
+    func deleteConversations(at offsets: IndexSet, in context: ModelContext, from conversations: [Conversation]) {
+        let titles = buildConversationTitles(from: conversations)
+        for index in offsets {
+            let conversationId = titles[index].0
+            deleteConversation(conversationId: conversationId, in: context, from: conversations)
+        }
+    }
+    
+    // MARK: - Presentation Logic (Transform)
+    // conversationTitlesを生成（Context不要）
+    func buildConversationTitles(from conversations: [Conversation]) -> [(UUID, String, Date)]
+}
+```
 
 ## 4. 実装ステップ (Implementation Steps)
 
-- [ ] **Step 1: OpenRouterServiceの作成**
-  - OpenRouter APIと通信するためのサービスクラスを作成。
-  - APIキーをUserDefaultsから読み込むロジックを実装。
-  - HTTPリクエストの送信とレスポンスの解析を行う。
-  - モデル一覧を取得するメソッドを追加。
-  - ストリーミング受信に対応したメソッドを追加。
+- [ ] **Step 1: ConversationListViewModelの作成**
+  - selectedConversationId, showingSettings の Published プロパティ
+  - 空の init()
+  - `createNewConversation(in:)` の実装
+  - `deleteConversation(conversationId:in:from:)` の実装
+  - `deleteConversations(at:in:from:)` の実装
+  - `buildConversationTitles(from:)` の実装（conversationTitlesのロジックを移行）
+  
+- [ ] **Step 2: ContentViewの更新**
+  - `@StateObject private var viewModel: ConversationListViewModel` を追加
+  - `@Query` は維持（データの監視用）
+  - `selectedConversationId` を `@State` から ViewModel の Published に変更
+  - `showingSettings` を `@State` から ViewModel の Published に変更
+  - `conversationGroups`, `conversationTitles` コンピューテッドプロパティを削除
+  - `deleteConversation()`, `deleteConversations(at:)`, `createNewConversation()` を viewModel へ委譲（modelContextを渡す）
+  - セル表示部分を `viewModel.buildConversationTitles(from: conversations)` を使用するよう修正
+  
+- [ ] **Step 3: ビルド確認**
+  - Xcodeでビルドしてエラーがないことを確認
 
-- [ ] **Step 2: Conversationモデルの作成**
-  - SwiftData用のConversationモデルを作成。
-  - role, content, timestamp, conversationIdをプロパティとして定義。
-
-- [ ] **Step 3: SettingsViewModelとSettingsViewの作成**
-  - APIキーの入力・保存とモデル一覧の取得・選択を管理。
-  - APIキーをUserDefaultsに保存。
-  - 選択したモデルをUserDefaultsに保存。
-
-- [ ] **Step 4: ContentViewの拡張**
-  - List部分を「会話セッションのリスト」に変更。
-  - 新しい会話を作成できるボタンを追加。
-  - 各会話は独立した履歴として保存・表示。
-  - 会話の削除機能を追加。
-  - 会話作成時にユーザーが任意のタイトルを入力できるようにする。
-  - 最初のユーザー発言の最初の30文字程度を自動でタイトルにする。
-  - タイトルを長押しで編集できるようにする。
-
-- [ ] **Step 5: ChatViewModelの拡張**
-  - OpenRouterServiceを注入。
-  - 会話履歴をSwiftDataから取得・保存するロジックを実装。
-  - AIへのリクエスト送信とローディング状態の管理を実装。
-  - エラー処理を実装。
-  - 選択したモデルを使用してリクエストを送信。
-
-- [ ] **Step 6: ChatViewの拡張**
-  - ユーザー入力とAI返答を区別して表示（右寄せ/左寄せ）。
-  - ローディングインジケータを表示。
-  - エラーメッセージをアラートで表示。
-
-- [ ] **Step 7: モデル選択画面の作成**
-  - モデル一覧を表示し、検索・選択できる画面を作成。
-  - 選択したモデルをSettingsViewModelに通知。
-
-- [ ] **Step 8: ビルドチェックとテスト**
-  - プロジェクトが正常にビルドできることを確認。
-  - 基本的な対話機能をテスト。
-  - Xcodeのコンソールでデバッグ情報を確認できるようにする。
+- [ ] **Step 4: Class Diagramの更新**
+  - ConversationListViewModel を追加
+  - ContentView のメソッドを削除
 
 ## 5. 決定事項・履歴 (Decision Log)
-- [x] AI APIはOpenRouterを使用 (理由: 複数のモデルを一括で利用可能)
-- [x] HTTP通信はAlamofireを使用 (理由: Swiftの定番HTTPライブラリでコードが簡潔)
-- [x] APIキーはUserDefaultsに保存 (理由: ユーザーがアプリ上で入力する仕様のため)
-- [x] 会話履歴はSwiftDataで保存 (理由: 既存のプロジェクトで使用中)
-- [x] エラーはアラートで通知 (理由: ユーザーに明確に伝えるため)
+- [x] ConversationListViewModelを新規作成（既存のViewModelが単一会話管理のため分離）
+- [x] conversationGroups/conversationTitlesはA案（コンピューテッドプロパティ/メソッド）
+- [x] selectedConversationIdはA案（ConversationListViewModelで管理）
+- [x] @QueryはViewに残す（SwiftDataの制約によりハイブリッド型を採用）
+- [x] modelContextはinitで 받지ずにメソッド引数で渡す（@StateObject初期化タイミング問題への対応）
 
-## 6. 未決事項 (Open Questions) & 設計の詰め
-- [ ] **レスポンス方式**: ストリーミング受信を実装するか？（推奨: Yes）
-- [ ] **表示リッチ化**: Markdownやコードハイライト用のライブラリを導入するか？（まずは標準Textで進め、後で検討でも可）
-- [ ] **データ管理**: 会話の削除機能をListに追加するか？（推奨: Yes）
-- [ ] **システムプロンプト**: 「あなたは優秀なエンジニアです」等の役割設定を保存・送信する機能は必要か？（今回はスコープ外として固定にするか、設定画面に追加するか）
-
-## 7. 追加要件の反映 (Updated Requirements)
-
-### 機能要件の追加
-- **設定画面の追加**:
-  - OpenRouter APIキーを入力・保存できる設定画面を追加。
-  - APIキーを保存後、モデル一覧を取得して表示。
-  - モデル一覧から検索・選択できる機能を実装。
-- **会話のグループ化**:
-  - ContentViewのList部分を「会話セッションのリスト」に変更。
-  - 新しい会話を作成できるボタンを追加。
-  - 各会話は独立した履歴として保存・表示。
-- **モデル選択機能**:
-  - 選択したモデルを使用してAIと対話。
-  - モデルの変更が即座に反映される。
-- **会話のタイトル管理**:
-  - 会話作成時にユーザーが任意のタイトルを入力できるようにする。
-  - 最初のユーザー発言の最初の30文字程度を自動でタイトルにする。
-  - タイトルを長押しで編集できるようにする。
-
-### 非機能要件の追加
-- **設定の永続化**: APIキーと選択したモデルはアプリ再起動後も保持。
-- **UX向上**: モデル選択画面で検索しやすく、選択しやすいUIを実装。
-- **デバッグ情報**: Xcodeのコンソールでデバッグ情報を確認できるようにする。
+## 6. 未決事項 (Open Questions)
+- [ ] なし（すべて決定済み、GO状態）
