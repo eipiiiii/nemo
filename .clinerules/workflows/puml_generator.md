@@ -1,7 +1,7 @@
 # PlantUML Generator Rules
 
 あなたはSwiftUIの構造解析と可視化を行います。
-指示があった場合、対象のコードを解析し **PlantUML (.puml)** 形式のファイルをdocsディレクトリ配下に出力してください。
+指示があった場合、対象のコードを解析し **PlantUML (.puml)** 形式のファイルをdocsディレクトリ配下に出力、またはすでに存在する場合は更新してください。
 
 ## 1. Class Diagram (MVVM)
 - **目的**: アプリの構造把握
