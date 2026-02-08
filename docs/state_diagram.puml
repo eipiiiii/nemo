@@ -4,131 +4,182 @@ skinparam defaultFontSize 12
 skinparam stateBackgroundColor #LightBlue
 skinparam stateBorderColor #DarkBlue
 
-title nemo - State Diagram (Chat Flow)
+title nemo - State Diagram (Status)
 
-' ===== Chat Screen State Machine =====
-state ChatState <<fork>> {
-
-    [*] --> Idle : アプリ起動\nconversationId設定
+' ===== ChatViewModel State Machine =====
+state ChatViewModelState {
+    [*] --> Idle : init()
 
     state Idle {
-        [*] --> Ready
-        Ready : 入力可能\n(isLoading == false)
+        [*] --> Ready : loadMessages()完了
+        Ready : messageText: String
+        Ready : messages: [Conversation]
+        Ready : isLoading = false
+        Ready : errorMessage = nil
     }
 
     state Loading {
-        [*] --> APIRequest
-        APIRequest : メッセージ送信中\n(isLoading == true)
+        state Validating <<entryPoint>> {
+            Validating : 入力チェック
+            Validating : - messageText.isEmpty
+            Validating : - selectedModelId.isEmpty
+        }
 
-        APIRequest --> AwaitingResponse : API応答待ち
-        AwaitingResponse : ローディング表示
+        state Sending <<exitPoint>> {
+            Sending : isLoading = true
+            Sending : SwiftDataに保存
+        }
+
+        state AwaitingResponse {
+            AwaitingResponse : API通信中
+            AwaitingResponse : async/await
+        }
     }
 
     state Success {
-        [*] --> DisplayingResponse
-        DisplayingResponse : AI応答表示完了\n(isLoading == false)
+        [*] --> ResponseReceived
+        ResponseReceived : isLoading = false
+        ResponseReceived : assistantメッセージ追加
     }
 
     state Error {
-        [*] --> ValidationError
-        ValidationError : 入力エラー\n(errorMessage設定)
+        state ValidationError {
+            ValidationError : errorMessage = "モデル未選択"
+        }
 
-        ValidationError --> Ready : エラー閉じる
+        state NetworkError {
+            NetworkError : errorMessage = "通信エラー"
+        }
 
-        [*] --> NetworkError
-        NetworkError : 通信エラー\n(errorMessage設定)
-
-        NetworkError --> Ready : リトライ\n再送信
+        state NoInputError {
+            NoInputError : errorMessage = nil
+            NoInputError : (早期return)
+        }
     }
 }
 
-' ===== State Transitions =====
+' ===== Transitions =====
+Ready --> Validating : sendMessage()呼び出し
 
-' Idle -> Loading transitions
-Ready --> APIRequest : sendMessage()\n(入力あり & モデル選択済み)
+Validating --> NoInputError : [messageText.isEmpty]
+Validating --> ValidationError : [selectedModelId.isEmpty]
+Validating --> Sending : [入力OK]
 
-Ready --> ValidationError : sendMessage()\n(モデル未選択)
+Sending --> AwaitingResponse : Task開始
+AwaitingResponse --> ResponseReceived : API成功
+AwaitingResponse --> NetworkError : API失敗/例外
 
-APIRequest : onSubmit / TextField入力
-APIRequest : isLoading = true
+ResponseReceived --> Ready : 状態リセット
+NoInputError --> Ready : (即座に戻る)
+ValidationError --> Ready : エラークリア
+NetworkError --> Ready : エラークリア/再試行
 
-' Loading -> Success
-AwaitingResponse --> DisplayingResponse : API成功\n(response受信)
-
-DisplayingResponse : messages更新\n(assistant追加)
-DisplayingResponse : isLoading = false
-
-' Loading -> Error
-AwaitingResponse --> NetworkError : API失敗\n(error発生)
-
-NetworkError : errorMessage設定
-
-' Error -> Ready transitions
-ValidationError -[#Orange]-> Ready : 閉じるボタン押下
-
-NetworkError -[#Orange]-> Ready : 設定変更
-
-' Success -> Idle (new message)
-DisplayingResponse --> Ready : 次のメッセージ入力
-
-' ===== Settings Screen State Machine =====
-state SettingsState <<fork>> {
-
-    [*] --> SettingsIdle
+' ===== SettingsViewModel State Machine =====
+state SettingsViewModelState {
+    [*] --> SettingsIdle : init() / loadSettings()
 
     state SettingsIdle {
-        [*] --> APIKeyEntered
-        APIKeyEntered : APIキー入力済
+        SettingsIdle : apiKey: String
+        SettingsIdle : customPrompt: String
+        SettingsIdle : models: []
+        SettingsIdle : isLoading = false
     }
 
-    state LoadingModels {
-        [*] --> FetchingModels
-        FetchingModels : モデル取得中\n(isLoading == true)
+    state FetchingModels {
+        FetchingModels : isLoading = true
+        FetchingModels : APIキー検証
     }
 
     state ModelsLoaded {
-        [*] --> ModelListReady
-        ModelListReady : モデル一覧表示
+        ModelsLoaded : models: [Model]
+        ModelsLoaded : isLoading = false
     }
 
-    state SelectionMode {
-        [*] --> ModelSelected
-        ModelSelected : モデル選択済
+    state ModelSelected {
+        ModelSelected : selectedModelId: String
+        ModelSelected : UserDefaults保存
     }
 
-    state ErrorState {
-        [*] --> SettingsError
-        SettingsError : エラー表示
+    state SettingsError {
+        SettingsError : errorMessage: String
+        SettingsError : isLoading = false
     }
 }
 
-' Settings transitions
-APIKeyEntered --> FetchingModels : fetchModels()\n(APIキーあり)
+' ===== Settings Transitions =====
+SettingsIdle --> FetchingModels : fetchModels()
+SettingsIdle --> SettingsError : [apiKey.isEmpty]
 
-FetchingModels --> ModelListReady : API成功\n(models取得)
-
+FetchingModels --> ModelsLoaded : API成功
 FetchingModels --> SettingsError : API失敗
 
-ModelListReady --> ModelSelected : モデル選択\n(selectModel)
+ModelsLoaded --> ModelSelected : selectModel()
+ModelSelected --> SettingsIdle : (状態継続)
 
-ModelSelected --> ModelListReady : 変更ボタン押下
+SettingsError --> SettingsIdle : エラークリア
 
-SettingsError --> APIKeyEntered : エラー閉じる
+' ===== ConversationListViewModel State Machine =====
+state ConversationListViewModelState {
+    [*] --> ListIdle : init()
 
-note right of ChatState
+    state ListIdle {
+        ListIdle : selectedConversationId: UUID?
+        ListIdle : columnVisibility: .all
+        ListIdle : showingSettings: false
+    }
+
+    state ConversationSelected {
+        ConversationSelected : selectedConversationId: UUID
+    }
+
+    state CreatingConversation {
+        CreatingConversation : 新規UUID生成
+        CreatingConversation : selectedConversationId更新
+    }
+
+    state DeletingConversation {
+        DeletingConversation : SwiftDataから削除
+        DeletingConversation : selectedConversationIdクリア
+    }
+
+    state SettingsPresented {
+        SettingsPresented : showingSettings = true
+    }
+}
+
+' ===== List Transitions =====
+ListIdle --> ConversationSelected : 会話タップ
+ListIdle --> CreatingConversation : 新規ボタン押下
+ListIdle --> DeletingConversation : 削除スワイプ/コンテキストメニュー
+ListIdle --> SettingsPresented : 設定ボタン押下
+
+CreatingConversation --> ConversationSelected : (自動遷移)
+DeletingConversation --> ListIdle : 削除完了
+SettingsPresented --> ListIdle : sheet閉じる
+
+note right of ChatViewModelState
   主要トリガー:
-  - onAppear: メッセージ読み込み
-  - onSubmit: メッセージ送信
-  - onChange: 状態変化検出
-  - Button Tap: エラー閉じる
+  - onAppear: loadMessages()
+  - onSubmit: sendMessage()
+  - onChange: UI状態更新
+  
+  @Publishedプロパティ:
+  - messageText, messages
+  - isLoading, errorMessage
 end note
 
-note bottom of SettingsState
-  設定変更の流れ:
-  1. APIキー入力 -> saveApiKey()
-  2. モデル一覧取得 -> fetchModels()
-  3. モデル選択 -> selectModel()
-  4. 設定永続化 -> UserDefaults
+note right of SettingsViewModelState
+  UserDefaults連携:
+  - openrouter_api_key
+  - custom_prompt
+  - selected_model_id
+end note
+
+note bottom of ConversationListViewModelState
+  NavigationSplitView連携:
+  - columnVisibility制御
+  - selectedConversationIdで
+    detail表示切り替え
 end note
 
 @enduml

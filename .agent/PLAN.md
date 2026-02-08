@@ -1,120 +1,87 @@
-# プロジェクト計画: ContentViewのリファクタリング
-**Status**: Completed
+# プロジェクト計画: MarkdownUI表示の修正
+**Status**: Draft
 
 ## 1. 目的と背景 (Goal & Context)
-SwiftUIのベストプラクティスに従い、ContentViewに書かれているビジネスロジックをViewModelに移行する。
+ChatViewでのMarkdownUI表示に以下の問題があるため修正する。
 
 **問題点**:
-- ContentViewがSwiftDataのビジネスロジックを直接持っている
-- Viewのテストが困難
-- 単一責任原則 위반
+1. 文字の後ろの背景色がウィンドウの背景色と異なる（不自然な背景色が表示される）
+2. 文字サイズが大きすぎる
 
 **成功の定義**:
-- ContentViewが「見た目」onlyになる
-- ConversationListViewModelが会話リストの管理を担当する
+- Markdown表示部分の背景色がウィンドウ背景色と統一される
+- 文字サイズが適切な大きさになる
 
 ## 2. 要件定義 (Requirements)
 - **機能要件**:
-  - 会話リストの作成・削除機能が引き続き動作する
-  - 会話のグループ化とタイトル表示が動作する
+  - MarkdownUIの背景色を透明またはウィンドウ背景色に設定
+  - MarkdownUIのフォントサイズを調整
 - **非機能要件**:
-  - SwiftUI + SwiftData のベストプラクティスに従う
-  - 既存のテストが動作する
+  - 既存のMarkdownレンダリング機能は維持
+  - ダーク/ライトモード両方で正常に表示
 
 ## 3. 基本設計 (Architecture & Design)
 
 ### 技術スタック
-- 言語: Swift
-- FW: SwiftUI + SwiftData
-- パターン: MVVM（ハイブリッド型）
+- SwiftUI
+- MarkdownUIライブラリ
 
-### 重要: SwiftDataとSwiftUIの制約
-1. **`@Query`はSwiftUI View内でのみ動作する** - Viewに残す（データの読み出し・監視）
-2. **`@Environment`の初期化タイミング問題** - ViewModelのinit時点でEnvironmentの値にアクセスできないため、modelContextは保持せずメソッド引数で渡す
+### 修正対象
+- `nemo/Views/ChatView.swift` の `MessageBubbleView`
 
-### ディレクトリ構成案
-```
-nemo/
-  ViewModels/
-    ChatViewModel.swift              (既存 - 単一会話内メッセージ管理)
-    ConversationListViewModel.swift  (新規作成 - 会話リスト管理)
-```
-
-### ConversationListViewModelの設計
+### 修正内容
 ```swift
-@MainActor
-class ConversationListViewModel: ObservableObject {
-    // ナビゲーション状態
-    @Published var selectedConversationId: UUID?
-    @Published var showingSettings: Bool = false
-    
-    init() {}
-    
-    // MARK: - Actions (Write)
-    // modelContextを引数で受け取る
-    
-    func createNewConversation(in context: ModelContext) -> UUID {
-        let conversationId = UUID()
-        selectedConversationId = conversationId
-        return conversationId
-    }
-    
-    func deleteConversation(conversationId: UUID, in context: ModelContext, from conversations: [Conversation]) {
-        let conversationsToDelete = conversations.filter { $0.conversationId == conversationId }
-        for conversation in conversationsToDelete {
-            context.delete(conversation)
-        }
-        if selectedConversationId == conversationId {
-            selectedConversationId = nil
-        }
-    }
-    
-    func deleteConversations(at offsets: IndexSet, in context: ModelContext, from conversations: [Conversation]) {
-        let titles = buildConversationTitles(from: conversations)
-        for index in offsets {
-            let conversationId = titles[index].0
-            deleteConversation(conversationId: conversationId, in: context, from: conversations)
-        }
-    }
-    
-    // MARK: - Presentation Logic (Transform)
-    // conversationTitlesを生成（Context不要）
-    func buildConversationTitles(from conversations: [Conversation]) -> [(UUID, String, Date)]
-}
+// 現在のコード
+Markdown(message.content)
+    .markdownTheme(.gitHub)
+    .textSelection(.enabled)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(Color(nsColor: .windowBackgroundColor))
 ```
+
+**修正案**:
+1. 背景色問題: Markdownコンポーネント自体の背景を透明にし、親Viewの背景色に統一
+2. フォントサイズ: カスタムテーマを作成してフォントサイズを縮小
 
 ## 4. 実装ステップ (Implementation Steps)
 
-- [ ] **Step 1: ConversationListViewModelの作成**
-  - selectedConversationId, showingSettings の Published プロパティ
-  - 空の init()
-  - `createNewConversation(in:)` の実装
-  - `deleteConversation(conversationId:in:from:)` の実装
-  - `deleteConversations(at:in:from:)` の実装
-  - `buildConversationTitles(from:)` の実装（conversationTitlesのロジックを移行）
-  
-- [ ] **Step 2: ContentViewの更新**
-  - `@StateObject private var viewModel: ConversationListViewModel` を追加
-  - `@Query` は維持（データの監視用）
-  - `selectedConversationId` を `@State` から ViewModel の Published に変更
-  - `showingSettings` を `@State` から ViewModel の Published に変更
-  - `conversationGroups`, `conversationTitles` コンピューテッドプロパティを削除
-  - `deleteConversation()`, `deleteConversations(at:)`, `createNewConversation()` を viewModel へ委譲（modelContextを渡す）
-  - セル表示部分を `viewModel.buildConversationTitles(from: conversations)` を使用するよう修正
-  
-- [ ] **Step 3: ビルド確認**
-  - Xcodeでビルドしてエラーがないことを確認
+- [x] **Step 1: 背景色の修正**
+  - MarkdownViewの背景を透明に設定
+  - 親Viewの背景設定を調整
 
-- [ ] **Step 4: Class Diagramの更新**
-  - ConversationListViewModel を追加
-  - ContentView のメソッドを削除
+- [x] **Step 2: フォントサイズとテーマの修正**
+  - `.gitHub` テーマをベースに `.text` モディファイアを追加
+  - `FontSize(13)` を適用（macOS標準サイズ）
+  - `ForegroundColor(.primary)` を適用（ダークモード対応）
+
+- [x] **Step 3: ビルド確認**
+  - Xcodeでビルドしてエラーがないことを確認
+  - プレビューで表示を確認
 
 ## 5. 決定事項・履歴 (Decision Log)
-- [x] ConversationListViewModelを新規作成（既存のViewModelが単一会話管理のため分離）
-- [x] conversationGroups/conversationTitlesはA案（コンピューテッドプロパティ/メソッド）
-- [x] selectedConversationIdはA案（ConversationListViewModelで管理）
-- [x] @QueryはViewに残す（SwiftDataの制約によりハイブリッド型を採用）
-- [x] modelContextはinitで 받지ずにメソッド引数で渡す（@StateObject初期化タイミング問題への対応）
+- [x] テーマは.gitHubをベースにカスタマイズ
+- [x] 背景色は親Viewで制御
+- [x] フォントサイズは13pt（macOS標準サイズ）
 
 ## 6. 未決事項 (Open Questions)
-- [ ] なし（すべて決定済み、GO状態）
+- [x] なし（すべて決定済み）
+
+## 7. 実装コード案
+
+```swift
+Markdown(message.content)
+    .markdownTheme(
+        .gitHub
+        .text {
+            FontSize(13)
+            ForegroundColor(.primary)
+        }
+    )
+    .textSelection(.enabled)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(Color(nsColor: .windowBackgroundColor))
+```

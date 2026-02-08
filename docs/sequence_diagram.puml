@@ -5,93 +5,229 @@ skinparam sequenceParticipantBackgroundColor #LightYellow
 skinparam sequenceActorBackgroundColor #LightBlue
 skinparam sequenceLifeLineBackgroundColor #LightGreen
 
-title nemo - Sequence Diagram (Message Send Flow)
+title nemo - Sequence Diagram (Async Flow)
 
 actor User
-participant "ChatView\n(SwiftUI View)" as View
-participant "ChatViewModel\n(@MainActor)" as VM
+participant "ChatView\n(SwiftUI View)" as View <<@MainActor>>
+participant "ChatViewModel\n(@MainActor)" as VM <<@MainActor>>
 participant "ModelContext\n(SwiftData)" as Context
-participant "OpenRouterService" as Service
+participant "OpenRouterService\n(Sendable)" as Service <<nonisolated>>
 participant "OpenRouter API" as API
 
-' === メッセージ送信フロー ===
-group メッセージ送信フロー
-    User ->> View : メッセージ入力 [TextField]
-    View ->> VM : messageText 更新 [@Binding]
-
-    User ->> View : Sendボタン押下 [onSubmit]
-
-    View ->> VM : sendMessage()
-
-    alt 入力OK
-        VM ->> Context : insert(userMessage)
-        VM ->> VM : messages.append(userMessage)
-        VM ->> VM : messageText = ""
-        VM ->> VM : isLoading = true
-
-        VM ->> Service : sendMessage(messages:, modelId:)
-        Service ->> API : POST /chat/completions
-        API --> Service : ChatResponse
-        Service --> VM : responseText
-
-        VM ->> Context : insert(assistantMessage)
-        VM ->> VM : messages.append(assistantMessage)
-        VM ->> VM : isLoading = false
-
-        VM --> View : UI更新
-        View ->> User : 応答表示
-    else 入力エラー
-        VM --> View : errorMessage設定
-        View --> User : エラー表示
-    end
+' === 初期化フロー ===
+group 1. 初期化フロー (onAppear)
+    User -> View : ChatView表示
+    activate View
+    
+    View -> VM : ChatViewModel初期化 [@StateObject]
+    activate VM
+    
+    VM -> VM : loadMessages()
+    VM -> Context : FetchDescriptor<Conversation>
+    activate Context
+    Context --> VM : messages[]
+    deactivate Context
+    
+    VM -> VM : messages = fetched [@Published]
+    VM --> View : UI自動更新
+    
+    VM -> VM : loadSelectedModel()
+    VM -> VM : UserDefaults.string(forKey:)
+    VM --> VM : selectedModelId
+    
+    deactivate VM
+    deactivate View
 end
 
-' === 初期化フロー ===
-group 初期化フロー
-    User ->> View : 画面表示
-    View ->> VM : ChatViewModel初期化 [@StateObject]
+' === メッセージ送信フロー ===
+group 2. メッセージ送信フロー (async/await)
+    User -> View : メッセージ入力
+    activate View
+    View -> VM : messageText更新 [@Binding]
+    
+    User -> View : Returnキー押下 [onSubmit]
+    View -> VM : sendMessage()
+    activate VM
+    
+    alt 入力検証
+        opt messageText.isEmpty
+            VM --> View : (早期return)
+        end
+        
+        opt selectedModelId.isEmpty
+            VM -> VM : errorMessage = "モデル未選択"
+            VM --> View : エラー表示
+        end
+    end
+    
+    ' ===== ユーザー メッセージ保存 =====
+    VM -> VM : userMessage作成
+    VM -> Context : insert(userMessage)
+    activate Context
+    Context --> VM : 
+    deactivate Context
+    
+    VM -> VM : messages.append(userMessage) [@Published]
+    VM --> View : UI自動更新
+    VM -> VM : messageText = ""
+    VM -> VM : isLoading = true [@Published]
+    VM --> View : ローディング表示開始
+    
+    ' ===== API通信 (非同期) =====
+    VM -> Service : sendMessage(messages:modelId:)
+    activate Service
+    
+    note right: nonisolated関数
+    
+    Service -> Service : システムプロンプト結合
+    Service -> Service : ChatRequest作成
+    
+    Service -> API : POST /chat/completions
+    activate API
+    
+    note right: await待機
+    
+    API --> Service : ChatResponse (JSON)
+    deactivate API
+    
+    Service -> Service : JSONデコード
+    Service --> VM : responseText
+    deactivate Service
+    
+    note right: MainActorに自動復帰
+    
+    ' ===== AI応答保存 =====
+    VM -> VM : assistantMessage作成
+    VM -> Context : insert(assistantMessage)
+    activate Context
+    Context --> VM : 
+    deactivate Context
+    
+    VM -> VM : messages.append(assistantMessage) [@Published]
+    VM -> VM : isLoading = false [@Published]
+    VM --> View : UI自動更新
+    
+    deactivate VM
+    View --> User : 応答表示完了
+    deactivate View
+end
 
-    VM ->> Context : FetchDescriptor [SwiftData]
-    Context --> VM : messages[]
-    VM ->> VM : messages = fetched [@Published]
-
-    VM ->> VM : loadSelectedModel()
-    VM ->> VM : UserDefaults取得
+' === エラーハンドリングフロー ===
+group 3. エラーハンドリングフロー
+    User -> View : メッセージ送信
+    activate View
+    View -> VM : sendMessage()
+    activate VM
+    
+    VM -> Service : sendMessage(messages:modelId:)
+    activate Service
+    
+    Service -> API : POST /chat/completions
+    activate API
+    API --> Service : HTTP 401/403/500
+    deactivate API
+    
+    Service --> VM : throw NetworkError.httpError(code)
+    deactivate Service
+    
+    VM -> VM : errorMessage = "AIへの送信に失敗" [@Published]
+    VM -> VM : isLoading = false [@Published]
+    VM --> View : UI自動更新
+    
+    deactivate VM
+    View --> User : エラー表示
+    deactivate View
 end
 
 ' === 設定変更フロー ===
-group 設定変更フロー
-    User ->> View : Settingsボタン押下 [Toolbar]
-    View ->> SettingsView : sheet表示
-
-    SettingsView ->> SettingsVM : StateObject初期化
-    SettingsVM ->> SettingsVM : loadSettings()
-
-    User ->> SettingsView : APIキー入力
-    SettingsView ->> SettingsVM : apiKey更新
-    SettingsVM ->> SettingsVM : saveApiKey()
-
-    User ->> SettingsView : モデル一覧取得
-    SettingsVM ->> Service : getModels()
-    Service ->> API : GET /models
+group 4. 設定変更フロー
+    participant "SettingsView\n(@MainActor)" as SView <<@MainActor>>
+    participant "SettingsViewModel\n(@MainActor)" as SVM <<@MainActor>>
+    
+    User -> View : 設定ボタン押下
+    activate View
+    View -> SView : sheet表示
+    activate SView
+    
+    SView -> SVM : SettingsViewModel初期化 [@StateObject]
+    activate SVM
+    SVM -> SVM : loadSettings()
+    SVM -> SVM : UserDefaults読み込み
+    SVM --> SView : UI表示
+    
+    User -> SView : APIキー入力
+    SView -> SVM : apiKey更新
+    SVM -> SVM : saveApiKey()
+    SVM -> SVM : UserDefaults.set(apiKey)
+    
+    User -> SView : 「モデル一覧を取得」
+    SView -> SVM : fetchModels()
+    SVM -> SVM : isLoading = true
+    
+    SVM -> Service : getModels()
+    activate Service
+    Service -> API : GET /models
+    activate API
     API --> Service : ModelsResponse
-    Service --> SettingsVM : [Model]
+    deactivate API
+    Service --> SVM : [Model]
+    deactivate Service
+    
+    SVM -> SVM : models = [Model] [@Published]
+    SVM -> SVM : isLoading = false
+    SVM --> SView : モデル一覧表示
+    
+    User -> SView : モデル選択
+    SView -> SVM : selectModel(model)
+    SVM -> SVM : UserDefaults保存
+    
+    deactivate SVM
+    deactivate SView
+    deactivate View
+end
 
-    User ->> SettingsView : モデル選択
-    SettingsView ->> SettingsVM : selectModel(model)
-    SettingsVM ->> SettingsVM : UserDefaults保存
+' === 会話削除フロー ===
+group 5. 会話削除フロー
+    participant "ContentView\n(@MainActor)" as CView <<@MainActor>>
+    participant "ConversationListViewModel\n(@MainActor)" as CLVM <<@MainActor>>
+    
+    User -> CView : 会話スワイプ削除
+    activate CView
+    
+    CView -> CLVM : deleteConversations(at:)
+    activate CLVM
+    
+    CLVM -> CLVM : buildConversationTitles()
+    CLVM -> Context : delete(conversation)
+    activate Context
+    Context --> CLVM : 
+    deactivate Context
+    
+    CLVM -> CLVM : selectedConversationId = nil
+    CLVM --> CView : UI更新
+    
+    deactivate CLVM
+    deactivate CView
 end
 
 note right of VM
   @MainActor:
-  - UI更新はメインスレッド
-  - async/awaitで自動スケジューリング
+  - UI更新はメインスレッド保証
+  - @Published変更でView自動更新
+  - async/awaitで非同期処理
 end note
 
 note right of Service
-  nonisolated:
-  - Thread-safe
-  - sendMessage() / getModels()
+  nonisolated + Sendable:
+  - グローバルアクタ外で実行
+  - Thread-safeな並列処理
+  - API通信の待機中、Mainスレッド解放
+end note
+
+note right of API
+  OpenRouter API:
+  - /models: モデル一覧取得
+  - /chat/completions: チャット応答
 end note
 
 @enduml
