@@ -14,7 +14,7 @@ struct ContentView: View {
     @StateObject private var viewModel = ConversationListViewModel()
     
     var body: some View {
-        NavigationSplitView(columnVisibility: $viewModel.columnVisibility) {
+        NavigationSplitView {
             // サイドバー
             List(selection: $viewModel.selectedConversationId) {
                 ForEach(viewModel.buildConversationTitles(from: conversations), id: \.0) { conversationId, title, date in
@@ -62,7 +62,7 @@ struct ContentView: View {
                     }
                     .help("設定")
                 }
-            }
+                }
         } detail: {
             if let selectedId = viewModel.selectedConversationId {
                 ChatView(conversationId: selectedId, modelContext: modelContext)

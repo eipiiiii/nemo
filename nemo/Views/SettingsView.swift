@@ -33,31 +33,6 @@ struct SettingsView: View {
             // コンテンツ
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // API設定
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("OpenRouter API")
-                            .font(.headline)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("APIキー")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            SecureField("APIキーを入力", text: $viewModel.apiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit {
-                                    viewModel.saveApiKey()
-                                }
-                            
-                            Button("モデル一覧を取得") {
-                                viewModel.saveApiKey()
-                                viewModel.fetchModels()
-                            }
-                            .disabled(viewModel.isLoading || viewModel.apiKey.isEmpty)
-                        }
-                    }
-                    
-                    Divider()
-                    
                     // カスタムプロンプト設定
                     VStack(alignment: .leading, spacing: 12) {
                         Text("カスタム指示")
@@ -100,6 +75,32 @@ struct SettingsView: View {
                     
                     Divider()
                     
+                    // API設定
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("OpenRouter API")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("APIキー")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            SecureField("APIキーを入力", text: $viewModel.apiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit {
+                                    viewModel.saveApiKey()
+                                }
+                            
+                            Button("モデル一覧を取得") {
+                                viewModel.saveApiKey()
+                                viewModel.fetchModels()
+                            }
+                            .disabled(viewModel.isLoading || viewModel.apiKey.isEmpty)
+                        }
+                    }
+                    
+                    Divider()
+                    
+
                     // モデル選択
                     VStack(alignment: .leading, spacing: 12) {
                         Text("選択中のモデル")

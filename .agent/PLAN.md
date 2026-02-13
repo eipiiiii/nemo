@@ -1,87 +1,113 @@
-# プロジェクト計画: MarkdownUI表示の修正
+# プロジェクト計画: チャットビューのツールバー統合
 **Status**: Draft
 
 ## 1. 目的と背景 (Goal & Context)
-ChatViewでのMarkdownUI表示に以下の問題があるため修正する。
+チャットビューの上部にあるバー（ウィンドウタイトルバーとツールバー）が区切られていて、ツールバーとコンテンツエリアの間に境界線があるため、一体化させる。
 
 **問題点**:
-1. 文字の後ろの背景色がウィンドウの背景色と異なる（不自然な背景色が表示される）
-2. 文字サイズが大きすぎる
+1. ツールバーとコンテンツエリアの間に境界線があり、見た目が分断されている
+2. ウィンドウタイトルバーとツールバーが別々に表示されている
 
 **成功の定義**:
-- Markdown表示部分の背景色がウィンドウ背景色と統一される
-- 文字サイズが適切な大きさになる
+- ツールバー背景を非表示にし、タイトル表示モードをインラインに設定
+- チャットビューのコンテンツとツールバーが一体化する
 
 ## 2. 要件定義 (Requirements)
 - **機能要件**:
-  - MarkdownUIの背景色を透明またはウィンドウ背景色に設定
-  - MarkdownUIのフォントサイズを調整
+  - ツールバー背景を非表示にする
+  - タイトル表示モードをインラインに設定
+  - チャットビューのコンテンツとツールバーが一体化する
 - **非機能要件**:
-  - 既存のMarkdownレンダリング機能は維持
+  - 既存の機能は維持
   - ダーク/ライトモード両方で正常に表示
 
 ## 3. 基本設計 (Architecture & Design)
 
 ### 技術スタック
 - SwiftUI
-- MarkdownUIライブラリ
+- macOS ウィンドウスタイル
 
 ### 修正対象
-- `nemo/Views/ChatView.swift` の `MessageBubbleView`
+- `nemo/ContentView.swift` の `ChatView` 部分
+- `nemo/Views/ChatView.swift` の全体
 
 ### 修正内容
 ```swift
-// 現在のコード
-Markdown(message.content)
-    .markdownTheme(.gitHub)
-    .textSelection(.enabled)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
-    .background(Color(nsColor: .windowBackgroundColor))
-```
+// ContentView.swiftのChatView部分
+ChatView(conversationId: selectedId, modelContext: modelContext)
+    .id(selectedId)
+    .toolbarBackground(.hidden, for: .windowToolbar)  // ツールバー背景を非表示
+    .toolbarTitleDisplayMode(.inline)  // タイトル表示モードをインラインに
 
-**修正案**:
-1. 背景色問題: Markdownコンポーネント自体の背景を透明にし、親Viewの背景色に統一
-2. フォントサイズ: カスタムテーマを作成してフォントサイズを縮小
+// ChatView.swiftの全体
+var body: some View {
+    VStack(spacing: 0) {
+        // 既存のチャットビューコンテンツ
+    }
+    .toolbarBackground(.hidden, for: .windowToolbar)
+    .background(Color(nsColor: .windowBackgroundColor))
+}
+```
 
 ## 4. 実装ステップ (Implementation Steps)
 
-- [x] **Step 1: 背景色の修正**
-  - MarkdownViewの背景を透明に設定
-  - 親Viewの背景設定を調整
+- [ ] **Step 1: ContentView.swiftの修正**
+  - ChatViewにtoolbarBackgroundとtoolbarTitleDisplayModeモディファイアを追加
 
-- [x] **Step 2: フォントサイズとテーマの修正**
-  - `.gitHub` テーマをベースに `.text` モディファイアを追加
-  - `FontSize(13)` を適用（macOS標準サイズ）
-  - `ForegroundColor(.primary)` を適用（ダークモード対応）
+- [ ] **Step 2: ChatView.swiftの修正**
+  - VStackのスペーシングを0に設定
+  - toolbarBackgroundとbackgroundモディファイアを追加
 
-- [x] **Step 3: ビルド確認**
+- [ ] **Step 3: ビルド確認**
   - Xcodeでビルドしてエラーがないことを確認
   - プレビューで表示を確認
 
 ## 5. 決定事項・履歴 (Decision Log)
-- [x] テーマは.gitHubをベースにカスタマイズ
-- [x] 背景色は親Viewで制御
-- [x] フォントサイズは13pt（macOS標準サイズ）
+- [ ] ツールバー背景を非表示にする
+- [ ] タイトル表示モードをインラインにする
+- [ ] スペーシングを0にして一体化する
 
 ## 6. 未決事項 (Open Questions)
-- [x] なし（すべて決定済み）
+- [ ] なし（すべて決定済み）
 
 ## 7. 実装コード案
 
 ```swift
-Markdown(message.content)
-    .markdownTheme(
-        .gitHub
-        .text {
-            FontSize(13)
-            ForegroundColor(.primary)
-        }
-    )
-    .textSelection(.enabled)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
+// ContentView.swift
+.detail: {
+    if let selectedId = viewModel.selectedConversationId {
+        ChatView(conversationId: selectedId, modelContext: modelContext)
+            .id(selectedId)
+            .toolbarBackground(.hidden, for: .windowToolbar)
+            .toolbarTitleDisplayMode(.inline)
+    } else {
+        // 既存のコード
+    }
+}
+
+// ChatView.swift
+var body: some View {
+    VStack(spacing: 0) {
+        // 既存のチャットビューコンテンツ
+    }
+    .toolbarBackground(.hidden, for: .windowToolbar)
     .background(Color(nsColor: .windowBackgroundColor))
+}
 ```
+
+## 8. テスト計画 (Testing Plan)
+- [ ] macOS 26+ での動作確認
+- [ ] ウィンドウリサイズ時の表示確認
+- [ ] サイドバー表示/非表示の切り替え確認
+- [ ] 既存の全ツールバーボタンの動作確認
+- [ ] Before/After のスクリーンショット比較
+
+## 9. リスクと代替案 (Risks & Alternatives)
+**リスク**:
+- NavigationSplitView との相性問題
+- macOS 26+ での動作確認が必要
+
+**代替案**:
+1. `.windowToolbarStyle(.unified)` の使用
+2. カスタム NSHostingView での実装
+3. `.safeAreaInset` による手動調整
