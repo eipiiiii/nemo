@@ -54,7 +54,6 @@ struct ChatView: View {
                         }
                     }
                 }
-                
             }
             // メッセージ下部のグラデーション
             .overlay(alignment: .bottom) {
@@ -108,7 +107,8 @@ struct ChatView: View {
                 .padding(.vertical, 12)
             }
         }
-//        .id(conversationId)
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 

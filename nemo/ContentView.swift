@@ -67,6 +67,8 @@ struct ContentView: View {
             if let selectedId = viewModel.selectedConversationId {
                 ChatView(conversationId: selectedId, modelContext: modelContext)
                     .id(selectedId)
+                    .toolbarBackground(.hidden, for: .windowToolbar)  // ツールバー背景を非表示
+                    .toolbarTitleDisplayMode(.inline)  // タイトル表示モードをインラインに
             } else {
                 VStack(spacing: 16) {
                     Image(systemName: "bubble.left.and.bubble.right")
