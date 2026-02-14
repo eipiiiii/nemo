@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import MarkdownUI
 
+
 struct ChatView: View {
     let conversationId: UUID
     let modelContext: ModelContext
@@ -54,19 +55,6 @@ struct ChatView: View {
                         }
                     }
                 }
-            }
-            // メッセージ下部のグラデーション
-            .overlay(alignment: .bottom) {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(nsColor: .windowBackgroundColor).opacity(0),
-                        Color(nsColor: .windowBackgroundColor).opacity(0.5),
-                        Color(nsColor: .windowBackgroundColor).opacity(1)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 100)
             }
             
             // 入力エリア(Liquid Glass効果付き)
@@ -126,7 +114,8 @@ struct MessageBubbleView: View {
                     Text(message.content)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(Color.blue)
+                        .foregroundColor(.primary)
+                        .background(Color.gray.opacity(0.25))
                         .cornerRadius(18)
                 } else {
                     Markdown(message.content)

@@ -77,12 +77,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		350539722F4056D400AB4A06 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		3582B2452F2D8A1C00CE5F1D = {
 			isa = PBXGroup;
 			children = (
 				3582B2502F2D8A1C00CE5F1D /* nemo */,
 				3582B2602F2D8A1E00CE5F1D /* nemoTests */,
 				3582B26A2F2D8A1E00CE5F1D /* nemoUITests */,
+				350539722F4056D400AB4A06 /* Frameworks */,
 				3582B24F2F2D8A1C00CE5F1D /* Products */,
 			);
 			sourceTree = "<group>";
