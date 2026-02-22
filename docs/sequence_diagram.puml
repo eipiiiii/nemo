@@ -45,8 +45,7 @@ group 2. メッセージ送信フロー (async/await)
     activate View
     View -> VM : messageText更新 [@Binding]
     
-    User -> View : Returnキー押下 [onSubmit]
-    View -> VM : sendMessage()
+    
     activate VM
     
     alt 入力検証
@@ -144,9 +143,7 @@ group 4. 設定変更フロー
     participant "SettingsView\n(@MainActor)" as SView <<@MainActor>>
     participant "SettingsViewModel\n(@MainActor)" as SVM <<@MainActor>>
     
-    User -> View : 設定ボタン押下
-    activate View
-    View -> SView : sheet表示
+    
     activate SView
     
     SView -> SVM : SettingsViewModel初期化 [@StateObject]

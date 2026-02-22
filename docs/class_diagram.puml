@@ -8,11 +8,7 @@ title nemo - Class Diagram (MVVM)
 
 ' ===== App Entry =====
 package "App" {
-    struct nemoApp <<SwiftUI.App>> {
-        - sharedModelContainer: ModelContainer
-        --
-        + body: some Scene
-    }
+    
 }
 
 ' ===== View Layer =====
@@ -35,11 +31,7 @@ package "Views" {
         + body: some View
     }
 
-    struct MessageBubbleView <<SwiftUI.View>> {
-        - message: Conversation
-        --
-        + body: some View
-    }
+    
 
     struct SettingsView <<SwiftUI.View>> {
         - viewModel: SettingsViewModel <<@StateObject>>
@@ -49,14 +41,7 @@ package "Views" {
         + body: some View
     }
 
-    struct ModelSelectionView <<SwiftUI.View>> {
-        - viewModel: SettingsViewModel <<@ObservedObject>>
-        - searchText: String <<@State>>
-        - dismiss: DismissAction <<@Environment>>
-        --
-        + body: some View
-        + filteredModels: [Model] { get }
-    }
+    
 }
 
 ' ===== ViewModel Layer =====
@@ -72,7 +57,7 @@ package "ViewModels" {
         + createNewConversation(in:) -> UUID
         + deleteConversation(conversationId:in:from:)
         + deleteConversations(at:in:from:)
-        + buildConversationTitles(from:) -> [(UUID, String, Date)]
+        
     }
 
     class ChatViewModel <<@MainActor, ObservableObject>> {

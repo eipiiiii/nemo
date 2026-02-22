@@ -97,7 +97,7 @@ state SettingsViewModelState {
 
     state ModelSelected {
         ModelSelected : selectedModelId: String
-        ModelSelected : UserDefaults保存
+        ModelSelected : 
     }
 
     state SettingsError {
@@ -160,7 +160,7 @@ SettingsPresented --> ListIdle : sheet閉じる
 note right of ChatViewModelState
   主要トリガー:
   - onAppear: loadMessages()
-  - onSubmit: sendMessage()
+  - 
   - onChange: UI状態更新
   
   @Publishedプロパティ:
