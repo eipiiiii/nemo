@@ -32,9 +32,20 @@ struct ChatView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
+                            // 保存済みメッセージ
                             ForEach(viewModel.messages) { message in
                                 MessageBubbleView(message: message)
                                     .id(message.id)
+                            }
+                            // ストリーミング中のリアルタイム表示
+                            if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
+                                StreamingBubbleView(content: viewModel.streamingContent)
+                                    .id("streaming")
+                            }
+                            // ストリーミング開始直後（まだ文字が来ていない）
+                            if viewModel.isStreaming && viewModel.streamingContent.isEmpty {
+                                TypingIndicatorView()
+                                    .id("typing")
                             }
                         }
                         .padding()
@@ -47,6 +58,14 @@ struct ChatView: View {
                             }
                         }
                     }
+                    .onChange(of: viewModel.isStreaming) { _, isStreaming in
+                        if isStreaming {
+                            withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
+                        }
+                    }
+                    .onChange(of: viewModel.streamingContent) { _, _ in
+                        proxy.scrollTo("streaming", anchor: .bottom)
+                    }
                     .onChange(of: viewModel.isLoading) { _, isLoading in
                         if !isLoading, let lastMessage = viewModel.messages.last {
                             withAnimation {
@@ -57,7 +76,7 @@ struct ChatView: View {
                 }
             }
             
-            // 入力エリア(Liquid Glass効果付き)
+            // 入力エリア
             VStack(alignment: .leading, spacing: 0) {
                 // エラー表示
                 if let errorMessage = viewModel.errorMessage {
@@ -78,7 +97,7 @@ struct ChatView: View {
                     .background(Color.orange.opacity(0.1))
                 }
                 
-                // Liquid Glass入力フィールド
+                // 入力フィールド
                 HStack(alignment: .bottom, spacing: 12) {
                     TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -87,9 +106,26 @@ struct ChatView: View {
                         .padding(.vertical, 8)
                         .glassEffect(.clear, in: .capsule)
                         .onSubmit {
-                            viewModel.sendMessage()
+                            if viewModel.isStreaming {
+                                viewModel.cancelStreaming()
+                            } else {
+                                viewModel.sendMessage()
+                            }
                         }
                         .disabled(viewModel.isLoading)
+                    
+                    // ストリーミング中はキャンセルボタンを表示
+                    if viewModel.isStreaming {
+                        Button {
+                            viewModel.cancelStreaming()
+                        } label: {
+                            Image(systemName: "stop.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 4)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -97,6 +133,49 @@ struct ChatView: View {
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+// ストリーミング中のリアルタイム表示バブル
+struct StreamingBubbleView: View {
+    let content: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Markdown(content)
+                .markdownTheme(
+                    .gitHub
+                    .text {
+                        FontSize(13)
+                        ForegroundColor(.primary)
+                    }
+                )
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            Spacer(minLength: 60)
+        }
+    }
+}
+
+// 応答待ちのインジケーター（3点ドット）
+struct TypingIndicatorView: View {
+    @State private var dotCount = 0
+    private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Text(String(repeating: "●", count: dotCount + 1))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .onReceive(timer) { _ in
+                    dotCount = (dotCount + 1) % 3
+                }
+            Spacer()
+        }
     }
 }
 
@@ -145,15 +224,10 @@ struct MessageBubbleView: View {
     let container = try! ModelContainer(for: Conversation.self, configurations: config)
     let context = ModelContext(container)
 
-    // Seed mock messages for preview
     let conversationId = UUID()
     let messages: [Conversation] = [
         Conversation(id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(), conversationId: conversationId),
         Conversation(id: UUID(), role: "assistant", content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "user", content: "スクロールのテストをしたいので、少し長めのテキストを送ります。スクロール位置が下に追従するか確認してください。", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "assistant", content: "了解しました。以下はダミーテキストです。\n\nSwiftUI は宣言的な UI フレームワークで、ビューの状態に応じて UI を構築します。スクロールやレイアウトの挙動は、`ScrollView` や `LazyVStack` を組み合わせることで柔軟に表現できます。長文を表示することで、下部へのオートスクロールや表示の最適化を確認できます。さらにコードブロックや Markdown の表現も組み込めます。このように長文とコードを混在させて、見え方を確認してください。", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "user", content: "ありがとうございます！もう少しメッセージを追加しておきます。", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "assistant", content: "はい、十分な件数のメッセージがあるとスクロールのテストがしやすくなります。必要に応じてさらに増やしてください。", timestamp: Date(), conversationId: conversationId)
     ]
 
     let _ = messages.forEach { context.insert($0) }
