@@ -62,8 +62,9 @@ enum NetworkError: LocalizedError {
 
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
-    private let apiKeyKey = "openrouter_api_key"
+    private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
+    private let keychain = KeychainService.shared
 
     private let systemPrompt = """
         You are a helpful AI assistant.
@@ -206,7 +207,8 @@ final class OpenRouterService: Sendable {
         httpMethod: String,
         body: [String: Any]?
     ) throws -> URLRequest {
-        guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey), !apiKey.isEmpty else {
+        // APIキーを Keychain から読み込む
+        guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
             throw NSError(
                 domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
