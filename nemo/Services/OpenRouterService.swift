@@ -16,7 +16,7 @@ nonisolated struct ChatResponse: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// ストリーミング用チャンク（OpenAI互換: choices[0].delta.content）
+// ストリーミング用チャンク（OpenAI互敢: choices[0].delta.content）
 nonisolated struct StreamChunk: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Delta: Decodable, Sendable {
@@ -222,8 +222,17 @@ final class OpenRouterService: Sendable {
         }
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        // 不対角文字・改行などの混入を防ぐため trimming してからセット
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let authHeader = "Bearer \(trimmedKey)"
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // デバッグ: 送信する Authorization ヘッダを確認
+        let keyBytes = trimmedKey.utf8.map { $0 }
+        print("🔍 [Service] Authorization: 'Bearer \(trimmedKey.prefix(8))...' 文字数=\(trimmedKey.count) 末尾 bytes=\(keyBytes.suffix(4))")
+
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         }
