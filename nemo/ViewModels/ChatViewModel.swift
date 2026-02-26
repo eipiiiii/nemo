@@ -53,13 +53,9 @@ final class ChatViewModel: ObservableObject {
         messageText = ""
 
         let messageHistory = messages.map { ["role": $0.role, "content": $0.content] }
-        let modelId = UserDefaults.standard.string(forKey: "selected_model") ?? "openai/gpt-4o-mini"
 
-        // ▼ デバッグ用：コンソールで実際に送られるモデルIDを確認
-        print("🔍 MODEL_ID =", modelId)
-        print(
-            "🔍 UserDefaults['selected_model'] =",
-            UserDefaults.standard.string(forKey: "selected_model") ?? "nil（デフォルト使用）")
+        // SettingsViewModel と同じキー "selected_model_id" を使用
+        let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
 
         isStreaming = true
         streamingContent = ""
@@ -94,8 +90,6 @@ final class ChatViewModel: ObservableObject {
                 try? modelContext.save()
                 loadMessages()
             } catch {
-                // ▼ エラー内容も詳しく出力
-                print("❌ ERROR =", error.localizedDescription)
                 errorMessage = error.localizedDescription
             }
         }

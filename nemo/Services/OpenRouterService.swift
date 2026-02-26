@@ -28,7 +28,7 @@ nonisolated struct StreamChunk: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// OpenRouter のエラー形式（返ってくる時がある）
+// OpenRouter のエラー形式
 nonisolated struct ErrorEnvelope: Decodable, Sendable {
     struct Inner: Decodable, Sendable {
         let message: String?
@@ -65,45 +65,35 @@ final class OpenRouterService: Sendable {
     private let apiKeyKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
 
-    // 余計なインデントを入れない（空白増でトークンが増えるのを避ける）
     private let systemPrompt = """
-        You are a helpful AI assistant.
-        Provide accurate, concise, and well-structured responses.
+You are a helpful AI assistant.
+Provide accurate, concise, and well-structured responses.
 
-        # Formatting Guidelines
-        Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
+# Formatting Guidelines
+Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
 
-        - Use **bold** for emphasis on important points
-        - Use `inline code` for variable names, commands, or short code snippets
-        - Use code blocks with language specification for multi-line code:
-          ```swift
-          let example = "code here"
-        Use headings (## Heading) to structure longer responses
+- Use **bold** for emphasis on important points
+- Use `inline code` for variable names, commands, or short code snippets
+- Use code blocks with language specification for multi-line code:
+  ```swift
+  let example = "code here"
+  ```
+- Use headings (## Heading) to structure longer responses
+- Use bullet lists (-) or numbered lists (1.) for multiple items
+- Use > blockquotes for important notes or warnings
+- Use tables when comparing multiple items with different attributes
+- Use --- for horizontal rules to separate major sections if needed
 
-        Use bullet lists (-) or numbered lists (1.) for multiple items
-
-        Use > blockquotes for important notes or warnings
-
-        Use tables when comparing multiple items with different attributes
-
-        Use --- for horizontal rules to separate major sections if needed
-
-        Always format your responses in Markdown to make them clear and easy to read.
-        """
+Always format your responses in Markdown to make them clear and easy to read.
+"""
 
     nonisolated func getModels() async throws -> [Model] {
-        let request = try makeRequest(
-            path: "/models",
-            httpMethod: "GET",
-            body: nil
-        )
-
+        let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
             throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
         }
-
         do {
             return try JSONDecoder().decode(ModelsResponse.self, from: data).data
         } catch {
@@ -112,29 +102,18 @@ final class OpenRouterService: Sendable {
     }
 
     // 非ストリーミング（stream フィールドは送らない：変更前互換）
-    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws
-        -> String
-    {
+    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws -> String {
         let allMessages = buildMessagesWithSystemPrompt(messages: messages)
-
         let body: [String: Any] = [
             "model": modelId,
-            "messages": allMessages,
-                // "stream": false は **送らない**
+            "messages": allMessages
         ]
-
-        let request = try makeRequest(
-            path: "/chat/completions",
-            httpMethod: "POST",
-            body: body
-        )
-
+        let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
             throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
         }
-
         do {
             let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
             guard let content = decoded.choices.first?.message.content, !content.isEmpty else {
@@ -146,7 +125,7 @@ final class OpenRouterService: Sendable {
         }
     }
 
-    // ストリーミング（stream: true で SSE）[web:15]
+    // ストリーミング（stream: true で SSE）
     nonisolated func sendMessageStream(
         messages: [[String: String]],
         modelId: String
@@ -155,13 +134,11 @@ final class OpenRouterService: Sendable {
             Task {
                 do {
                     let allMessages = buildMessagesWithSystemPrompt(messages: messages)
-
                     let body: [String: Any] = [
                         "model": modelId,
                         "messages": allMessages,
-                        "stream": true,
+                        "stream": true
                     ]
-
                     let request = try makeRequest(
                         path: "/chat/completions",
                         httpMethod: "POST",
@@ -173,7 +150,7 @@ final class OpenRouterService: Sendable {
                         throw NetworkError.invalidResponse
                     }
 
-                    // 非 2xx の場合、まずボディを読んで原因を出す
+                    // 非 2xx の場合、ボディを読んで原因を出す
                     guard (200...299).contains(http.statusCode) else {
                         var bodyText = ""
                         for try await line in bytes.lines {
@@ -181,31 +158,24 @@ final class OpenRouterService: Sendable {
                         }
                         throw NetworkError.httpError(
                             http.statusCode,
-                            bodyText.trimmingCharacters(in: .whitespacesAndNewlines))
+                            bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
                     }
 
                     for try await line in bytes.lines {
-                        // SSE コメント行（ ":" で始まる）を無視する実装が必要。[web:15]
+                        // SSE コメント行（":" で始まる）を無視
                         if line.hasPrefix(":") || line.isEmpty { continue }
-
                         guard line.hasPrefix("data: ") else { continue }
                         let payload = String(line.dropFirst(6))
-
-                        if payload == "[DONE]" {
-                            break
-                        }
-
+                        if payload == "[DONE]" { break }
                         guard let data = payload.data(using: .utf8) else { continue }
-
-                        // choices[0].delta.content を読む
                         if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                            let delta = chunk.choices.first?.delta?.content,
-                            !delta.isEmpty
+                           let delta = chunk.choices.first?.delta?.content,
+                           !delta.isEmpty
                         {
                             continuation.yield(delta)
                         }
                     }
-
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -216,21 +186,12 @@ final class OpenRouterService: Sendable {
 
     // MARK: - Private
 
-    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]])
-        -> [[String: String]]
-    {
-        guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey), !apiKey.isEmpty else {
-            // 呼び出し元で throw したいがここは helper なので空配列にしない
-            // 実際は makeRequest 側で throw される
-            return messages
-        }
-
+    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]]) -> [[String: String]] {
         let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         var finalSystemPrompt = systemPrompt
         if !customPrompt.isEmpty {
             finalSystemPrompt += "\n\n# Custom Instructions\n\(customPrompt)"
         }
-
         var all = [["role": "system", "content": finalSystemPrompt]]
         all.append(contentsOf: messages)
         return all
@@ -242,22 +203,15 @@ final class OpenRouterService: Sendable {
         body: [String: Any]?
     ) throws -> URLRequest {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey), !apiKey.isEmpty else {
-            throw NSError(
-                domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
+            throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
         guard let url = URL(string: "\(baseURL)\(path)") else {
             throw NetworkError.invalidResponse
         }
-
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // これはドキュメント上「任意」だが、入れておくと識別しやすい（不要なら削除OK）
-        // request.setValue("http://localhost", forHTTPHeaderField: "HTTP-Referer")
-        // request.setValue("nemo", forHTTPHeaderField: "X-OpenRouter-Title")
-
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         }
@@ -266,7 +220,7 @@ final class OpenRouterService: Sendable {
 
     private nonisolated func decodeErrorMessage(_ data: Data) -> String? {
         if let env = try? JSONDecoder().decode(ErrorEnvelope.self, from: data),
-            let msg = env.error?.message
+           let msg = env.error?.message
         {
             return msg
         }
