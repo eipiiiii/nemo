@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MarkdownUI
+import Combine
 
 
 struct ChatView: View {
