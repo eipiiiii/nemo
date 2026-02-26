@@ -190,8 +190,7 @@ struct MessageBubbleView: View {
             Group {
                 if message.role == "user" {
                     Text(message.content)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
                         .foregroundColor(.primary)
                         .background(Color.gray.opacity(0.25))
                         .cornerRadius(18)
@@ -206,8 +205,7 @@ struct MessageBubbleView: View {
                         )
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
                 }
             }
 
@@ -218,10 +216,10 @@ struct MessageBubbleView: View {
     }
 }
 
-#Preview {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Conversation.self, configurations: config)
-    let context = ModelContext(container)
+// ストリーミング中の仮バブル（MarkdownUI未完結パース問題を回避するためText使用）
+struct StreamingBubbleView: View {
+    let content: String
+    @State private var showCursor = true
 
     let conversationId = UUID()
     let messages: [Conversation] = [

@@ -17,7 +17,6 @@ final class ChatViewModel: ObservableObject {
     private let conversationId: UUID
     private let modelContext: ModelContext
     private let openRouterService = OpenRouterService()
-
     private var streamingTask: Task<Void, Never>?
 
     init(conversationId: UUID, modelContext: ModelContext) {
@@ -55,7 +54,9 @@ final class ChatViewModel: ObservableObject {
         let messageHistory = messages.map { ["role": $0.role, "content": $0.content] }
 
         // SettingsViewModel と同じキー "selected_model_id" を使用
-        let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
+        let modelId =
+            UserDefaults.standard.string(forKey: "selected_model_id")
+            ?? "meta-llama/llama-3.3-70b-instruct:free"
 
         isStreaming = true
         streamingContent = ""
