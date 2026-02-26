@@ -30,7 +30,9 @@ class SettingsViewModel: ObservableObject {
     func saveApiKey() {
         do {
             try keychain.save(apiKey, forKey: apiKeyKeychainKey)
+            print("✅ [Keychain] 保存成功: \(apiKey.prefix(8))...")
         } catch {
+            print("❌ [Keychain] 保存失敗: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
     }
@@ -40,8 +42,9 @@ class SettingsViewModel: ObservableObject {
     }
 
     func loadSettings() {
-        // APIキーは Keychain から、それ以外は UserDefaults から読み込む
-        apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
+        let loaded = keychain.load(forKey: apiKeyKeychainKey)
+        print("🔑 [Keychain] load 結果: \(loaded.map { String($0.prefix(8)) + "..." } ?? "nil")")
+        apiKey = loaded ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
     }
