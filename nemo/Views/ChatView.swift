@@ -45,8 +45,6 @@ struct ChatView: View {
                 }
                 .padding()
             }
-            // inputBar を safeAreaInset で配置することで、
-            // ScrollView のコンテンツ領域が inputBar の高さ分自動で縮小される
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
@@ -134,7 +132,6 @@ struct ChatView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(.ultraThinMaterial)
     }
 }
 
