@@ -28,13 +28,12 @@ class SettingsViewModel: ObservableObject {
     }
 
     func saveApiKey() {
-        // 空文字では Keychain を上書きしない
-        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("⚠️ [Settings] saveApiKey スキップ: apiKey が空")
-            return
-        }
+        // 空白・改行を除去してから保存。空文字なら保存しない
+        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        apiKey = trimmed
         do {
-            try keychain.save(apiKey, forKey: apiKeyKeychainKey)
+            try keychain.save(trimmed, forKey: apiKeyKeychainKey)
         } catch {
             errorMessage = error.localizedDescription
         }
