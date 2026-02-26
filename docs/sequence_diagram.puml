@@ -72,8 +72,12 @@ group 2. メッセージ送信フロー (async/await)
     VM -> VM : isLoading = true [@Published]
     VM --> View : ローディング表示開始
     
-    ' ===== API通信 (非同期) =====
-    VM -> Service : sendMessage(messages:modelId:)
+    ' ===== ストリーミング開始 =====
+    VM -> VM : isStreaming = true [@Published]
+    VM --> View : タイピングインジケーター表示
+    
+    ' ===== API通信 (非同期ストリーミング) =====
+    VM -> Service : sendMessageStream(messages:modelId:)
     activate Service
     
     note right: nonisolated関数
@@ -86,7 +90,8 @@ group 2. メッセージ送信フロー (async/await)
     
     note right: await待機
     
-    API --> Service : ChatResponse (JSON)
+    API --> Service : チャンク応答
+    Service --> VM : chunk
     deactivate API
     
     Service -> Service : JSONデコード
@@ -94,6 +99,14 @@ group 2. メッセージ送信フロー (async/await)
     deactivate Service
     
     note right: MainActorに自動復帰
+    
+    ' ===== ストリーミング表示 =====
+    VM -> VM : streamingContent += chunk [@Published]
+    VM --> View : リアルタイム表示
+    
+    ' ===== ストリーミング終了 =====
+    VM -> VM : isStreaming = false [@Published]
+    VM --> View : タイピングインジケーター非表示
     
     ' ===== AI応答保存 =====
     VM -> VM : assistantMessage作成
@@ -118,7 +131,7 @@ group 3. エラーハンドリングフロー
     View -> VM : sendMessage()
     activate VM
     
-    VM -> Service : sendMessage(messages:modelId:)
+    VM -> Service : sendMessageStream(messages:modelId:)
     activate Service
     
     Service -> API : POST /chat/completions
@@ -131,6 +144,7 @@ group 3. エラーハンドリングフロー
     
     VM -> VM : errorMessage = "AIへの送信に失敗" [@Published]
     VM -> VM : isLoading = false [@Published]
+    VM -> VM : isStreaming = false [@Published]
     VM --> View : UI自動更新
     
     deactivate VM
@@ -212,13 +226,15 @@ note right of VM
   - UI更新はメインスレッド保証
   - @Published変更でView自動更新
   - async/awaitで非同期処理
+  - ストリーミング対応
 end note
 
 note right of Service
   nonisolated + Sendable:
-  - グローバルアクタ外で実行
+  - getModels() / sendMessage()
+  - sendMessageStream() for streaming
   - Thread-safeな並列処理
-  - API通信の待機中、Mainスレッド解放
+  - MainActor外で実行
 end note
 
 note right of API

@@ -16,6 +16,8 @@ state ChatViewModelState {
         Ready : messages: [Conversation]
         Ready : isLoading = false
         Ready : errorMessage = nil
+        Ready : isStreaming = false
+        Ready : streamingContent = ""
     }
 
     state Loading {
@@ -34,6 +36,12 @@ state ChatViewModelState {
             AwaitingResponse : API通信中
             AwaitingResponse : async/await
         }
+    }
+
+    state Streaming {
+        Streaming : isStreaming = true
+        Streaming : streamingContent: String
+        Streaming : リアルタイム表示中
     }
 
     state Success {
@@ -66,8 +74,11 @@ Validating --> ValidationError : [selectedModelId.isEmpty]
 Validating --> Sending : [入力OK]
 
 Sending --> AwaitingResponse : Task開始
-AwaitingResponse --> ResponseReceived : API成功
+AwaitingResponse --> Streaming : ストリーミング開始
 AwaitingResponse --> NetworkError : API失敗/例外
+
+Streaming --> Success : ストリーミング完了
+Streaming --> NetworkError : ストリーミング失敗
 
 ResponseReceived --> Ready : 状態リセット
 NoInputError --> Ready : (即座に戻る)
@@ -160,12 +171,12 @@ SettingsPresented --> ListIdle : sheet閉じる
 note right of ChatViewModelState
   主要トリガー:
   - onAppear: loadMessages()
-  - 
   - onChange: UI状態更新
   
   @Publishedプロパティ:
   - messageText, messages
   - isLoading, errorMessage
+  - isStreaming, streamingContent
 end note
 
 note right of SettingsViewModelState

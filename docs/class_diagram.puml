@@ -31,8 +31,6 @@ package "Views" {
         + body: some View
     }
 
-    
-
     struct SettingsView <<SwiftUI.View>> {
         - viewModel: SettingsViewModel <<@StateObject>>
         - showingModelSelection: Bool <<@State>>
@@ -41,7 +39,22 @@ package "Views" {
         + body: some View
     }
 
-    
+    struct MessageBubbleView <<SwiftUI.View>> {
+        - message: Conversation
+        --
+        + body: some View
+    }
+
+    struct StreamingBubbleView <<SwiftUI.View>> {
+        - content: String
+        --
+        + body: some View
+    }
+
+    struct TypingIndicatorView <<SwiftUI.View>> {
+        --
+        + body: some View
+    }
 }
 
 ' ===== ViewModel Layer =====
@@ -57,7 +70,6 @@ package "ViewModels" {
         + createNewConversation(in:) -> UUID
         + deleteConversation(conversationId:in:from:)
         + deleteConversations(at:in:from:)
-        
     }
 
     class ChatViewModel <<@MainActor, ObservableObject>> {
@@ -71,11 +83,14 @@ package "ViewModels" {
         + isLoading: Bool <<@Published>>
         + errorMessage: String? <<@Published>>
         + selectedModelId: String <<@Published>>
+        + streamingContent: String <<@Published>>
+        + isStreaming: Bool <<@Published>>
         --
         + init(conversationId:modelContext:)
         + loadMessages()
         + loadSelectedModel()
         + sendMessage()
+        + cancelStreaming()
     }
 
     class SettingsViewModel <<@MainActor, ObservableObject>> {
@@ -164,6 +179,7 @@ package "Services" {
         --
         + getModels() async throws -> [Model]
         + sendMessage(messages:modelId:) async throws -> String
+        + sendMessageStream(messages:modelId:) async throws -> AsyncThrowingStream<String, Error>
     }
 
     struct ModelsResponse <<Codable, Sendable>> {
@@ -213,7 +229,8 @@ ContentView *--> Conversation : @Query
 
 ChatView *--> ChatViewModel : @StateObject
 ChatView --> MessageBubbleView : embeds
-MessageBubbleView --> Conversation : displays
+ChatView --> StreamingBubbleView : embeds
+ChatView --> TypingIndicatorView : embeds
 
 SettingsView *--> SettingsViewModel : @StateObject
 SettingsView --> ModelSelectionView : sheet
@@ -225,30 +242,17 @@ ChatViewModel --> Conversation : manages via ModelContext
 SettingsViewModel --> OpenRouterService : uses
 SettingsViewModel --> Model : displays
 
-note right of ConversationListViewModel
-  @MainActor + ObservableObject:
-  - 会話リストの状態管理
-  - ナビゲーション制御
-  - SwiftDataへの書き込み
-end note
-
 note right of ChatViewModel
   @MainActor:
   - 単一会話内のメッセージ管理
-  - API通信を担当
+  - ストリーミング対応
   - async/awaitで非同期処理
 end note
 
-note right of SettingsViewModel
-  @MainActor:
-  - API設定の管理
-  - OpenRouterからモデル取得
-  - UserDefaultsに永続化
-end note
-
-note bottom of OpenRouterService
+note right of OpenRouterService
   nonisolated + Sendable:
   - getModels() / sendMessage()
+  - sendMessageStream() for streaming
   - Thread-safeな並列処理
   - MainActor外で実行
 end note
