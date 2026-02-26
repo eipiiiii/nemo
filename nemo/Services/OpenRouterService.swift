@@ -1,6 +1,6 @@
 import Foundation
 
-// 通信専用の型定義
+// 通信専用の型定義です
 nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
