@@ -1,96 +1,106 @@
-//
-//  ChatViewModel.swift
-//  nemo
-//
-//  Created by 林栄介 on 2026/01/31.
-//
-
 import Foundation
-import SwiftUI
 import Combine
 import SwiftData
+import SwiftUI
 
 @MainActor
 class ChatViewModel: ObservableObject {
-    @Published var messageText = ""
     @Published var messages: [Conversation] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var selectedModelId = ""
-    
-    private let service = OpenRouterService()
-    private let selectedModelKey = "selected_model_id"
-    private let model: ModelContext
-    
-    var conversationId: UUID
-    
+    @Published var messageText: String = ""
+    @Published var isLoading: Bool = false
+    @Published var errorMessage: String? = nil
+
+    // ストリーミング用
+    @Published var streamingContent: String = ""
+    @Published var isStreaming: Bool = false
+
+    private let conversationId: UUID
+    private let modelContext: ModelContext
+    private let openRouterService = OpenRouterService()
+    private var streamingTask: Task<Void, Never>?
+
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
-        self.model = modelContext
+        self.modelContext = modelContext
         loadMessages()
-        loadSelectedModel()
     }
-    
+
     func loadMessages() {
-        let conversationId = self.conversationId
-        let fetchDescriptor = FetchDescriptor<Conversation>(
-            predicate: #Predicate<Conversation> { conversation in
-                conversation.conversationId == conversationId
-            },
-            sortBy: [SortDescriptor(\Conversation.timestamp)]
+        let id = conversationId
+        let descriptor = FetchDescriptor<Conversation>(
+            predicate: #Predicate { $0.conversationId == id },
+            sortBy: [SortDescriptor(\.timestamp)]
         )
-        
-        do {
-            messages = try model.fetch(fetchDescriptor)
-        } catch {
-            print("Error loading messages: \(error)")
-        }
+        messages = (try? modelContext.fetch(descriptor)) ?? []
     }
-    
-    func loadSelectedModel() {
-        selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
-    }
-    
+
     func sendMessage() {
-        guard !messageText.isEmpty else { return }
-        guard !selectedModelId.isEmpty else {
-            errorMessage = "モデルが選択されていません。設定からモデルを選択してください。"
-            return
-        }
+        let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isLoading, !isStreaming else { return }
 
+        // ユーザーメッセージを保存
         let userMessage = Conversation(
-            role: "user",
-            content: messageText,
-            conversationId: conversationId
+            id: UUID(), role: "user", content: trimmed,
+            timestamp: Date(), conversationId: conversationId
         )
-        model.insert(userMessage)
-        
-        // Immediately update UI
-        messages.append(userMessage)
+        modelContext.insert(userMessage)
+        try? modelContext.save()
+        loadMessages()
         messageText = ""
-        isLoading = true
-        errorMessage = nil
 
-        Task {
-            // Use the messages array that has just been updated
-            let messagesForAPI = self.messages.map { ["role": $0.role, "content": $0.content] }
-            
+        let messageHistory = messages.map { ["role": $0.role, "content": $0.content] }
+        let modelId = UserDefaults.standard.string(forKey: "selected_model") ?? "openai/gpt-4o-mini"
+
+        isStreaming = true
+        streamingContent = ""
+
+        streamingTask = Task {
             do {
-                let responseText = try await service.sendMessage(messages: messagesForAPI, modelId: selectedModelId)
-                
-                let assistantMessage = Conversation(
-                    role: "assistant",
-                    content: responseText,
-                    conversationId: self.conversationId
-                )
-                model.insert(assistantMessage)
-                messages.append(assistantMessage)
+                for try await chunk in openRouterService.sendMessageStream(
+                    messages: messageHistory,
+                    modelId: modelId
+                ) {
+                    guard !Task.isCancelled else { break }
+                    streamingContent += chunk
+                }
 
+                // 完了後に SwiftData へ保存
+                if !Task.isCancelled, !streamingContent.isEmpty {
+                    let assistantMessage = Conversation(
+                        id: UUID(), role: "assistant", content: streamingContent,
+                        timestamp: Date(), conversationId: conversationId
+                    )
+                    modelContext.insert(assistantMessage)
+                    try? modelContext.save()
+                    loadMessages()
+                }
             } catch {
-                errorMessage = "AIへの送信に失敗しました: \(error.localizedDescription)"
+                errorMessage = error.localizedDescription
             }
-            
-            isLoading = false
+
+            isStreaming = false
+            streamingContent = ""
+            streamingTask = nil
         }
+    }
+
+    // ストリーミングを中断（途中テキストがあれば保存）
+    func cancelStreaming() {
+        streamingTask?.cancel()
+        streamingTask = nil
+
+        if !streamingContent.isEmpty {
+            let assistantMessage = Conversation(
+                id: UUID(), role: "assistant",
+                content: streamingContent + " *(中断)*",
+                timestamp: Date(), conversationId: conversationId
+            )
+            modelContext.insert(assistantMessage)
+            try? modelContext.save()
+            loadMessages()
+        }
+
+        isStreaming = false
+        streamingContent = ""
     }
 }
