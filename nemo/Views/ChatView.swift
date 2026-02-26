@@ -23,116 +23,117 @@ struct ChatView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // メッセージリスト
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            // 保存済みメッセージ
-                            ForEach(viewModel.messages) { message in
-                                MessageBubbleView(message: message)
-                                    .id(message.id)
-                            }
-                            // ストリーミング中のリアルタイム表示
-                            if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
-                                StreamingBubbleView(content: viewModel.streamingContent)
-                                    .id("streaming")
-                            }
-                            // ストリーミング開始直後（まだ文字が来ていない）
-                            if viewModel.isStreaming && viewModel.streamingContent.isEmpty {
-                                TypingIndicatorView()
-                                    .id("typing")
-                            }
-                        }
-                        .padding()
-                        .padding(.bottom, 60)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    // 保存済みメッセージ
+                    ForEach(viewModel.messages) { message in
+                        MessageBubbleView(message: message)
+                            .id(message.id)
                     }
-                    .onChange(of: viewModel.messages.count) { _, _ in
-                        if let lastMessage = viewModel.messages.last {
-                            withAnimation {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
+                    // ストリーミング中のリアルタイム表示
+                    if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
+                        StreamingBubbleView(content: viewModel.streamingContent)
+                            .id("streaming")
                     }
-                    .onChange(of: viewModel.isStreaming) { _, isStreaming in
-                        if isStreaming {
-                            withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
-                        }
+                    // ストリーミング開始直後（まだ文字が来ていない）
+                    if viewModel.isStreaming && viewModel.streamingContent.isEmpty {
+                        TypingIndicatorView()
+                            .id("typing")
                     }
-                    .onChange(of: viewModel.streamingContent) { _, _ in
-                        proxy.scrollTo("streaming", anchor: .bottom)
-                    }
-                    .onChange(of: viewModel.isLoading) { _, isLoading in
-                        if !isLoading, let lastMessage = viewModel.messages.last {
-                            withAnimation {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
+                }
+                .padding()
+            }
+            // inputBar を safeAreaInset で配置することで、
+            // ScrollView のコンテンツ領域が inputBar の高さ分自動で縮小される
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                inputBar
+            }
+            .onChange(of: viewModel.messages.count) { _, _ in
+                if let lastMessage = viewModel.messages.last {
+                    withAnimation {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
                 }
             }
-            
-            // 入力エリア
-            VStack(alignment: .leading, spacing: 0) {
-                // エラー表示
-                if let errorMessage = viewModel.errorMessage {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Button("閉じる") {
-                            viewModel.errorMessage = nil
-                        }
-                        .font(.caption)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.orange.opacity(0.1))
+            .onChange(of: viewModel.isStreaming) { _, isStreaming in
+                if isStreaming {
+                    withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
                 }
-                
-                // 入力フィールド
-                HStack(alignment: .bottom, spacing: 12) {
-                    TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .focused($isInputFocused)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .glassEffect(.clear, in: .capsule)
-                        .onSubmit {
-                            if viewModel.isStreaming {
-                                viewModel.cancelStreaming()
-                            } else {
-                                viewModel.sendMessage()
-                            }
-                        }
-                        .disabled(viewModel.isLoading)
-                    
-                    // ストリーミング中はキャンセルボタンを表示
-                    if viewModel.isStreaming {
-                        Button {
-                            viewModel.cancelStreaming()
-                        } label: {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 4)
+            }
+            .onChange(of: viewModel.streamingContent) { _, _ in
+                proxy.scrollTo("streaming", anchor: .bottom)
+            }
+            .onChange(of: viewModel.isLoading) { _, isLoading in
+                if !isLoading, let lastMessage = viewModel.messages.last {
+                    withAnimation {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+    
+    // MARK: - Input Bar
+    
+    @ViewBuilder
+    private var inputBar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // エラー表示
+            if let errorMessage = viewModel.errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("閉じる") {
+                        viewModel.errorMessage = nil
+                    }
+                    .font(.caption)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+            }
+            
+            // 入力フィールド
+            HStack(alignment: .bottom, spacing: 12) {
+                TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .focused($isInputFocused)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .glassEffect(.clear, in: .capsule)
+                    .onSubmit {
+                        if viewModel.isStreaming {
+                            viewModel.cancelStreaming()
+                        } else {
+                            viewModel.sendMessage()
+                        }
+                    }
+                    .disabled(viewModel.isLoading)
+                
+                // ストリーミング中はキャンセルボタンを表示
+                if viewModel.isStreaming {
+                    Button {
+                        viewModel.cancelStreaming()
+                    } label: {
+                        Image(systemName: "stop.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 4)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .background(.ultraThinMaterial)
     }
 }
 
