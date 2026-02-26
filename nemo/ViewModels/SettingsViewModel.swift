@@ -16,47 +16,56 @@ class SettingsViewModel: ObservableObject {
     @Published var selectedModelId = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
     private let service = OpenRouterService()
-    private let apiKeyKey = "openrouter_api_key"
+    private let keychain = KeychainService.shared
+    private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
     private let selectedModelKey = "selected_model_id"
-    
+
     init() {
         loadSettings()
     }
-    
+
     func saveApiKey() {
-        UserDefaults.standard.set(apiKey, forKey: apiKeyKey)
+        // 空白・改行を除去してから保存。空文字なら保存しない
+        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        apiKey = trimmed
+        do {
+            try keychain.save(trimmed, forKey: apiKeyKeychainKey)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
-    
+
     func saveCustomPrompt() {
         UserDefaults.standard.set(customPrompt, forKey: customPromptKey)
     }
-    
+
     func loadSettings() {
-        apiKey = UserDefaults.standard.string(forKey: apiKeyKey) ?? ""
+        apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
     }
-    
+
     func selectModel(_ model: Model) {
         selectedModelId = model.id
         UserDefaults.standard.set(selectedModelId, forKey: selectedModelKey)
     }
-    
+
     func fetchModels() {
         guard !apiKey.isEmpty else {
             errorMessage = "APIキーを入力してください"
             return
         }
-        
+
         isLoading = true
         errorMessage = nil
-        
+
         Task {
             do {
-                let models = try await service.getModels()
+                let models = try await service.getModels(apiKey: apiKey)
                 self.models = models
             } catch {
                 self.errorMessage = error.localizedDescription
