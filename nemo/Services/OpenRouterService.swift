@@ -1,18 +1,14 @@
 import Foundation
 
+// 通信専用の型定義
 nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
 
-nonisolated struct ChatRequest: Codable, Sendable {
-    let model: String
-    let messages: [[String: String]]
-    let stream: Bool  // ← 追加
-}
-
-nonisolated struct ChatResponse: Codable, Sendable {
-    struct Choice: Codable, Sendable {
-        struct Message: Codable, Sendable {
+// 非ストリーミング用レスポンス
+nonisolated struct ChatResponse: Decodable, Sendable {
+    struct Choice: Decodable, Sendable {
+        struct Message: Decodable, Sendable {
             let content: String
         }
         let message: Message
@@ -20,30 +16,46 @@ nonisolated struct ChatResponse: Codable, Sendable {
     let choices: [Choice]
 }
 
-// SSE ストリーミング用デルタ構造体
-nonisolated struct StreamDelta: Decodable, Sendable {
+// ストリーミング用チャンク（OpenAI互換: choices[0].delta.content）
+nonisolated struct StreamChunk: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Delta: Decodable, Sendable {
             let content: String?
         }
-        let delta: Delta
+        let delta: Delta?
         let finish_reason: String?
     }
     let choices: [Choice]
 }
 
+// OpenRouter のエラー形式
+nonisolated struct ErrorEnvelope: Decodable, Sendable {
+    struct Inner: Decodable, Sendable {
+        let message: String?
+        let code: Int?
+    }
+    let error: Inner?
+}
+
 enum NetworkError: LocalizedError {
     case invalidResponse
-    case httpError(Int)
+    case httpError(Int, String?)
     case noData
     case decodingError(Error)
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "無効なレスポンスです"
-        case .httpError(let c): return "HTTPエラー: \(c)"
-        case .noData: return "データが受信されませんでした"
-        case .decodingError(let e): return "データの解析に失敗しました: \(e.localizedDescription)"
+        case .invalidResponse:
+            return "無効なレスポンスです"
+        case .httpError(let code, let detail):
+            if let detail, !detail.isEmpty {
+                return "HTTPエラー: \(code)\n\(detail)"
+            }
+            return "HTTPエラー: \(code)"
+        case .noData:
+            return "データが受信されませんでした"
+        case .decodingError(let e):
+            return "データの解析に失敗しました: \(e.localizedDescription)"
         }
     }
 }
@@ -76,24 +88,12 @@ final class OpenRouterService: Sendable {
         """
 
     nonisolated func getModels() async throws -> [Model] {
-        guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
-            throw NSError(
-                domain: "", code: 0,
-                userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
-        }
-        guard let url = URL(string: "\(baseURL)/models") else { throw NetworkError.invalidResponse }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
+        let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
-            throw NetworkError.httpError(http.statusCode)
+            throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
         }
-
         do {
             return try JSONDecoder().decode(ModelsResponse.self, from: data).data
         } catch {
@@ -101,19 +101,24 @@ final class OpenRouterService: Sendable {
         }
     }
 
-    // 非ストリーミング版（後方互換のために残す）
+    // 非ストリーミング（stream フィールドは送らない：変更前互換）
     nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws
         -> String
     {
-        let request = try buildRequest(messages: messages, modelId: modelId, stream: false)
+        let allMessages = buildMessagesWithSystemPrompt(messages: messages)
+        let body: [String: Any] = [
+            "model": modelId,
+            "messages": allMessages,
+        ]
+        let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
-            throw NetworkError.httpError(http.statusCode)
+            throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
         }
         do {
-            let chatResponse = try JSONDecoder().decode(ChatResponse.self, from: data)
-            guard let content = chatResponse.choices.first?.message.content else {
+            let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
+            guard let content = decoded.choices.first?.message.content, !content.isEmpty else {
                 throw NetworkError.noData
             }
             return content
@@ -122,7 +127,7 @@ final class OpenRouterService: Sendable {
         }
     }
 
-    // ストリーミング版
+    // ストリーミング（stream: true で SSE）
     nonisolated func sendMessageStream(
         messages: [[String: String]],
         modelId: String
@@ -130,26 +135,47 @@ final class OpenRouterService: Sendable {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let request = try self.buildRequest(
-                        messages: messages, modelId: modelId, stream: true)
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    let allMessages = buildMessagesWithSystemPrompt(messages: messages)
+                    let body: [String: Any] = [
+                        "model": modelId,
+                        "messages": allMessages,
+                        "stream": true,
+                    ]
+                    let request = try makeRequest(
+                        path: "/chat/completions",
+                        httpMethod: "POST",
+                        body: body
+                    )
 
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
                     guard let http = response as? HTTPURLResponse else {
                         throw NetworkError.invalidResponse
                     }
+
+                    // 非 2xx の場合、ボディを読んで原因を出す
                     guard (200...299).contains(http.statusCode) else {
-                        throw NetworkError.httpError(http.statusCode)
+                        var bodyText = ""
+                        for try await line in bytes.lines {
+                            bodyText += line + "\n"
+                        }
+                        throw NetworkError.httpError(
+                            http.statusCode,
+                            bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
                     }
 
                     for try await line in bytes.lines {
+                        // SSE コメント行（":" で始まる）を無視
+                        if line.hasPrefix(":") || line.isEmpty { continue }
                         guard line.hasPrefix("data: ") else { continue }
-                        let json = String(line.dropFirst(6))
-                        if json == "[DONE]" { break }
-                        guard let data = json.data(using: .utf8) else { continue }
-                        if let content = try? JSONDecoder().decode(StreamDelta.self, from: data)
-                            .choices.first?.delta.content
+                        let payload = String(line.dropFirst(6))
+                        if payload == "[DONE]" { break }
+                        guard let data = payload.data(using: .utf8) else { continue }
+                        if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
+                            let delta = chunk.choices.first?.delta?.content,
+                            !delta.isEmpty
                         {
-                            continuation.yield(content)
+                            continuation.yield(delta)
                         }
                     }
                     continuation.finish()
@@ -162,33 +188,47 @@ final class OpenRouterService: Sendable {
 
     // MARK: - Private
 
-    private nonisolated func buildRequest(
-        messages: [[String: String]],
-        modelId: String,
-        stream: Bool
-    ) throws -> URLRequest {
-        guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey) else {
-            throw NSError(
-                domain: "", code: 0,
-                userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
-        }
+    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]])
+        -> [[String: String]]
+    {
         let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
-        var finalPrompt = systemPrompt
-        if !customPrompt.isEmpty { finalPrompt += "\n\n# Custom Instructions\n\(customPrompt)" }
+        var finalSystemPrompt = systemPrompt
+        if !customPrompt.isEmpty {
+            finalSystemPrompt += "\n\n# Custom Instructions\n\(customPrompt)"
+        }
+        var all = [["role": "system", "content": finalSystemPrompt]]
+        all.append(contentsOf: messages)
+        return all
+    }
 
-        var allMessages = [["role": "system", "content": finalPrompt]]
-        allMessages.append(contentsOf: messages)
-
-        guard let url = URL(string: "\(baseURL)/chat/completions") else {
+    private nonisolated func makeRequest(
+        path: String,
+        httpMethod: String,
+        body: [String: Any]?
+    ) throws -> URLRequest {
+        guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey), !apiKey.isEmpty else {
+            throw NSError(
+                domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
+        }
+        guard let url = URL(string: "\(baseURL)\(path)") else {
             throw NetworkError.invalidResponse
         }
-
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = httpMethod
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(
-            ChatRequest(model: modelId, messages: allMessages, stream: stream))
+        if let body {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        }
         return request
+    }
+
+    private nonisolated func decodeErrorMessage(_ data: Data) -> String? {
+        if let env = try? JSONDecoder().decode(ErrorEnvelope.self, from: data),
+            let msg = env.error?.message
+        {
+            return msg
+        }
+        return String(data: data, encoding: .utf8)
     }
 }
