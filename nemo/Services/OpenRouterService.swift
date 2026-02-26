@@ -42,6 +42,7 @@ enum NetworkError: LocalizedError {
     case httpError(Int, String?)
     case noData
     case decodingError(Error)
+    case missingAPIKey
 
     var errorDescription: String? {
         switch self {
@@ -56,15 +57,15 @@ enum NetworkError: LocalizedError {
             return "データが受信されませんでした"
         case .decodingError(let e):
             return "データの解析に失敗しました: \(e.localizedDescription)"
+        case .missingAPIKey:
+            return "APIキーが設定されていません"
         }
     }
 }
 
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
-    private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
-    private let keychain = KeychainService.shared
 
     private let systemPrompt = """
         You are a helpful AI assistant.
@@ -88,8 +89,9 @@ final class OpenRouterService: Sendable {
         Always format your responses in Markdown to make them clear and easy to read.
         """
 
-    nonisolated func getModels() async throws -> [Model] {
-        let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil)
+    // APIキーを引数で受け取る
+    nonisolated func getModels(apiKey: String) async throws -> [Model] {
+        let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
@@ -102,16 +104,18 @@ final class OpenRouterService: Sendable {
         }
     }
 
-    // 非ストリーミング（stream フィールドは送らない：変更前互換）
-    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws
-        -> String
-    {
+    // 非ストリーミング
+    nonisolated func sendMessage(
+        messages: [[String: String]],
+        modelId: String,
+        apiKey: String
+    ) async throws -> String {
         let allMessages = buildMessagesWithSystemPrompt(messages: messages)
         let body: [String: Any] = [
             "model": modelId,
             "messages": allMessages,
         ]
-        let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body)
+        let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
@@ -131,7 +135,8 @@ final class OpenRouterService: Sendable {
     // ストリーミング（stream: true で SSE）
     nonisolated func sendMessageStream(
         messages: [[String: String]],
-        modelId: String
+        modelId: String,
+        apiKey: String
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -145,7 +150,8 @@ final class OpenRouterService: Sendable {
                     let request = try makeRequest(
                         path: "/chat/completions",
                         httpMethod: "POST",
-                        body: body
+                        body: body,
+                        apiKey: apiKey
                     )
 
                     let (bytes, response) = try await URLSession.shared.bytes(for: request)
@@ -205,12 +211,11 @@ final class OpenRouterService: Sendable {
     private nonisolated func makeRequest(
         path: String,
         httpMethod: String,
-        body: [String: Any]?
+        body: [String: Any]?,
+        apiKey: String
     ) throws -> URLRequest {
-        // APIキーを Keychain から読み込む
-        guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
-            throw NSError(
-                domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
+        guard !apiKey.isEmpty else {
+            throw NetworkError.missingAPIKey
         }
         guard let url = URL(string: "\(baseURL)\(path)") else {
             throw NetworkError.invalidResponse

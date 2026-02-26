@@ -17,6 +17,8 @@ final class ChatViewModel: ObservableObject {
     private let conversationId: UUID
     private let modelContext: ModelContext
     private let openRouterService = OpenRouterService()
+    private let keychain = KeychainService.shared
+    private let apiKeyKeychainKey = "openrouter_api_key"
 
     private var streamingTask: Task<Void, Never>?
 
@@ -39,6 +41,12 @@ final class ChatViewModel: ObservableObject {
         let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isLoading, !isStreaming else { return }
 
+        // @MainActor 上で Keychain から API キーを読み込む
+        guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
+            errorMessage = "APIキーが設定されていません。設定画面から入力してください。"
+            return
+        }
+
         // ユーザーメッセージを保存
         let userMessage = Conversation(
             id: UUID(),
@@ -53,8 +61,6 @@ final class ChatViewModel: ObservableObject {
         messageText = ""
 
         let messageHistory = messages.map { ["role": $0.role, "content": $0.content] }
-
-        // SettingsViewModel と同じキー "selected_model_id" を使用
         let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
 
         isStreaming = true
@@ -70,7 +76,8 @@ final class ChatViewModel: ObservableObject {
             do {
                 for try await chunk in openRouterService.sendMessageStream(
                     messages: messageHistory,
-                    modelId: modelId
+                    modelId: modelId,
+                    apiKey: apiKey
                 ) {
                     guard !Task.isCancelled else { return }
                     streamingContent += chunk

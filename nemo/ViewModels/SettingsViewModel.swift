@@ -30,9 +30,7 @@ class SettingsViewModel: ObservableObject {
     func saveApiKey() {
         do {
             try keychain.save(apiKey, forKey: apiKeyKeychainKey)
-            print("✅ [Keychain] 保存成功: \(apiKey.prefix(8))...")
         } catch {
-            print("❌ [Keychain] 保存失敗: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
     }
@@ -42,9 +40,7 @@ class SettingsViewModel: ObservableObject {
     }
 
     func loadSettings() {
-        let loaded = keychain.load(forKey: apiKeyKeychainKey)
-        print("🔑 [Keychain] load 結果: \(loaded.map { String($0.prefix(8)) + "..." } ?? "nil")")
-        apiKey = loaded ?? ""
+        apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
     }
@@ -65,7 +61,7 @@ class SettingsViewModel: ObservableObject {
 
         Task {
             do {
-                let models = try await service.getModels()
+                let models = try await service.getModels(apiKey: apiKey)
                 self.models = models
             } catch {
                 self.errorMessage = error.localizedDescription
