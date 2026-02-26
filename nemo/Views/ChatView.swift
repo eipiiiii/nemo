@@ -2,25 +2,25 @@
 //  ChatView.swift
 //  nemo
 //
-//  Created by 林栄介 on 2026/01/31.
+//  Created by 林栄介 on 2026/02/27.
 //
 
-import SwiftUI
-import SwiftData
-import MarkdownUI
 import Combine
-
+import MarkdownUI
+import SwiftData
+import SwiftUI
 
 struct ChatView: View {
     let conversationId: UUID
     let modelContext: ModelContext
     @StateObject private var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
-    
+
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
         self.modelContext = modelContext
-        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
+        _viewModel = StateObject(
+            wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
     }
 
     var body: some View {
@@ -74,9 +74,9 @@ struct ChatView: View {
         .toolbarBackground(.hidden, for: .windowToolbar)
         .background(Color(nsColor: .windowBackgroundColor))
     }
-    
+
     // MARK: - Input Bar
-    
+
     @ViewBuilder
     private var inputBar: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -98,7 +98,7 @@ struct ChatView: View {
                 .padding(.vertical, 8)
                 .background(Color.orange.opacity(0.1))
             }
-            
+
             // 入力フィールド
             HStack(alignment: .bottom, spacing: 12) {
                 TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
@@ -115,7 +115,7 @@ struct ChatView: View {
                         }
                     }
                     .disabled(viewModel.isLoading)
-                
+
                 // ストリーミング中はキャンセルボタンを表示
                 if viewModel.isStreaming {
                     Button {
@@ -138,16 +138,16 @@ struct ChatView: View {
 // ストリーミング中のリアルタイム表示バブル
 struct StreamingBubbleView: View {
     let content: String
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             Markdown(content)
                 .markdownTheme(
                     .gitHub
-                    .text {
-                        FontSize(13)
-                        ForegroundColor(.primary)
-                    }
+                        .text {
+                            FontSize(13)
+                            ForegroundColor(.primary)
+                        }
                 )
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -162,7 +162,7 @@ struct StreamingBubbleView: View {
 struct TypingIndicatorView: View {
     @State private var dotCount = 0
     private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             Text(String(repeating: "●", count: dotCount + 1))
@@ -180,13 +180,13 @@ struct TypingIndicatorView: View {
 
 struct MessageBubbleView: View {
     let message: Conversation
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             if message.role == "user" {
                 Spacer(minLength: 60)
             }
-            
+
             Group {
                 if message.role == "user" {
                     Text(message.content)
@@ -199,10 +199,10 @@ struct MessageBubbleView: View {
                     Markdown(message.content)
                         .markdownTheme(
                             .gitHub
-                            .text {
-                                FontSize(13)
-                                ForegroundColor(.primary)
-                            }
+                                .text {
+                                    FontSize(13)
+                                    ForegroundColor(.primary)
+                                }
                         )
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -210,7 +210,7 @@ struct MessageBubbleView: View {
                         .padding(.vertical, 10)
                 }
             }
-            
+
             if message.role != "user" {
                 Spacer(minLength: 60)
             }
@@ -225,8 +225,13 @@ struct MessageBubbleView: View {
 
     let conversationId = UUID()
     let messages: [Conversation] = [
-        Conversation(id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(), conversationId: conversationId),
-        Conversation(id: UUID(), role: "assistant", content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。", timestamp: Date(), conversationId: conversationId),
+        Conversation(
+            id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(),
+            conversationId: conversationId),
+        Conversation(
+            id: UUID(), role: "assistant",
+            content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。",
+            timestamp: Date(), conversationId: conversationId),
     ]
 
     let _ = messages.forEach { context.insert($0) }
