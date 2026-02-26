@@ -1,6 +1,6 @@
 import Foundation
 
-// 通信専用の型定義
+// 通信専用の型定義です
 nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
@@ -66,26 +66,26 @@ final class OpenRouterService: Sendable {
     private let customPromptKey = "custom_prompt"
 
     private let systemPrompt = """
-You are a helpful AI assistant.
-Provide accurate, concise, and well-structured responses.
+        You are a helpful AI assistant.
+        Provide accurate, concise, and well-structured responses.
 
-# Formatting Guidelines
-Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
+        # Formatting Guidelines
+        Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
 
-- Use **bold** for emphasis on important points
-- Use `inline code` for variable names, commands, or short code snippets
-- Use code blocks with language specification for multi-line code:
-  ```swift
-  let example = "code here"
-  ```
-- Use headings (## Heading) to structure longer responses
-- Use bullet lists (-) or numbered lists (1.) for multiple items
-- Use > blockquotes for important notes or warnings
-- Use tables when comparing multiple items with different attributes
-- Use --- for horizontal rules to separate major sections if needed
+        - Use **bold** for emphasis on important points
+        - Use `inline code` for variable names, commands, or short code snippets
+        - Use code blocks with language specification for multi-line code:
+          ```swift
+          let example = "code here"
+          ```
+        - Use headings (## Heading) to structure longer responses
+        - Use bullet lists (-) or numbered lists (1.) for multiple items
+        - Use > blockquotes for important notes or warnings
+        - Use tables when comparing multiple items with different attributes
+        - Use --- for horizontal rules to separate major sections if needed
 
-Always format your responses in Markdown to make them clear and easy to read.
-"""
+        Always format your responses in Markdown to make them clear and easy to read.
+        """
 
     nonisolated func getModels() async throws -> [Model] {
         let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil)
@@ -102,11 +102,13 @@ Always format your responses in Markdown to make them clear and easy to read.
     }
 
     // 非ストリーミング（stream フィールドは送らない：変更前互換）
-    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws -> String {
+    nonisolated func sendMessage(messages: [[String: String]], modelId: String) async throws
+        -> String
+    {
         let allMessages = buildMessagesWithSystemPrompt(messages: messages)
         let body: [String: Any] = [
             "model": modelId,
-            "messages": allMessages
+            "messages": allMessages,
         ]
         let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body)
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -137,7 +139,7 @@ Always format your responses in Markdown to make them clear and easy to read.
                     let body: [String: Any] = [
                         "model": modelId,
                         "messages": allMessages,
-                        "stream": true
+                        "stream": true,
                     ]
                     let request = try makeRequest(
                         path: "/chat/completions",
@@ -170,8 +172,8 @@ Always format your responses in Markdown to make them clear and easy to read.
                         if payload == "[DONE]" { break }
                         guard let data = payload.data(using: .utf8) else { continue }
                         if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                           let delta = chunk.choices.first?.delta?.content,
-                           !delta.isEmpty
+                            let delta = chunk.choices.first?.delta?.content,
+                            !delta.isEmpty
                         {
                             continuation.yield(delta)
                         }
@@ -186,7 +188,9 @@ Always format your responses in Markdown to make them clear and easy to read.
 
     // MARK: - Private
 
-    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]]) -> [[String: String]] {
+    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]])
+        -> [[String: String]]
+    {
         let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         var finalSystemPrompt = systemPrompt
         if !customPrompt.isEmpty {
@@ -203,7 +207,8 @@ Always format your responses in Markdown to make them clear and easy to read.
         body: [String: Any]?
     ) throws -> URLRequest {
         guard let apiKey = UserDefaults.standard.string(forKey: apiKeyKey), !apiKey.isEmpty else {
-            throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
+            throw NSError(
+                domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "APIキーが設定されていません"])
         }
         guard let url = URL(string: "\(baseURL)\(path)") else {
             throw NetworkError.invalidResponse
@@ -220,7 +225,7 @@ Always format your responses in Markdown to make them clear and easy to read.
 
     private nonisolated func decodeErrorMessage(_ data: Data) -> String? {
         if let env = try? JSONDecoder().decode(ErrorEnvelope.self, from: data),
-           let msg = env.error?.message
+            let msg = env.error?.message
         {
             return msg
         }
