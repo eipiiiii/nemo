@@ -42,10 +42,7 @@ final class ChatViewModel: ObservableObject {
         guard !trimmed.isEmpty, !isLoading, !isStreaming else { return }
 
         // @MainActor 上で Keychain から API キーを読み込む
-        let loaded = keychain.load(forKey: apiKeyKeychainKey)
-        print("🔑 [Chat] Keychain load: \(loaded.map { "'\($0.prefix(8))...' (文字数: \($0.count))" } ?? "nil")")
-
-        guard let apiKey = loaded, !apiKey.isEmpty else {
+        guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
             errorMessage = "APIキーが設定されていません。設定画面から入力してください。"
             return
         }
@@ -65,7 +62,6 @@ final class ChatViewModel: ObservableObject {
 
         let messageHistory = messages.map { ["role": $0.role, "content": $0.content] }
         let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
-        print("🚀 [Chat] ストリーミング開始: model=\(modelId), apiKey='\(apiKey.prefix(8))...'")
 
         isStreaming = true
         streamingContent = ""
@@ -101,7 +97,6 @@ final class ChatViewModel: ObservableObject {
                 try? modelContext.save()
                 loadMessages()
             } catch {
-                print("❌ [Chat] ストリーミングエラー: \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
             }
         }
