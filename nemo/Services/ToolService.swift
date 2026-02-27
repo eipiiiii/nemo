@@ -1,5 +1,5 @@
 import Foundation
-
+import os
 // MARK: - Tool 定義
 
 struct ToolParameter: Encodable {
