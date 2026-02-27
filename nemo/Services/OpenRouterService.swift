@@ -5,18 +5,32 @@ nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
 
-// 非ストリーミング用レスポンス
+// 非ストリーミング用レスポンス（tool call 対応）
 nonisolated struct ChatResponse: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Message: Decodable, Sendable {
-            let content: String
+            let role: String?
+            let content: String?
+            let tool_calls: [ToolCallResponse]?
         }
         let message: Message
+        let finish_reason: String?
     }
     let choices: [Choice]
 }
 
-// ストリーミング用チャンク（OpenAI互换: choices[0].delta.content）
+// tool_calls レスポンス型
+nonisolated struct ToolCallResponse: Decodable, Sendable {
+    struct Function: Decodable, Sendable {
+        let name: String
+        let arguments: String
+    }
+    let id: String
+    let type: String?
+    let function: Function
+}
+
+// ストリーミング用チャンク（OpenAI互換: choices[0].delta.content）
 nonisolated struct StreamChunk: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Delta: Decodable, Sendable {
@@ -103,45 +117,48 @@ final class OpenRouterService: Sendable {
         }
     }
 
-    nonisolated func sendMessage(
-        messages: [[String: String]],
+    /// tool call ループ用: 非ストリーミングで1ターン送信
+    /// tool_calls があれば Choice を返し、最終回答なら content を返す
+    nonisolated func sendMessageWithTools(
+        messages: [[String: Any]],
         modelId: String,
+        tools: [ToolDefinition],
         apiKey: String
-    ) async throws -> String {
-        let allMessages = buildMessagesWithSystemPrompt(messages: messages)
-        let body: [String: Any] = [
+    ) async throws -> ChatResponse.Choice {
+        var body: [String: Any] = [
             "model": modelId,
-            "messages": allMessages,
+            "messages": messages,
         ]
+        if !tools.isEmpty {
+            let encoder = JSONEncoder()
+            let toolsData = try encoder.encode(tools)
+            let toolsJSON = try JSONSerialization.jsonObject(with: toolsData)
+            body["tools"] = toolsJSON
+            body["tool_choice"] = "auto"
+        }
         let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
         guard (200...299).contains(http.statusCode) else {
             throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
         }
-        do {
-            let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
-            guard let content = decoded.choices.first?.message.content, !content.isEmpty else {
-                throw NetworkError.noData
-            }
-            return content
-        } catch {
-            throw NetworkError.decodingError(error)
-        }
+        let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
+        guard let choice = decoded.choices.first else { throw NetworkError.noData }
+        return choice
     }
 
+    // ストリーミング（最終回答用）
     nonisolated func sendMessageStream(
-        messages: [[String: String]],
+        messages: [[String: Any]],
         modelId: String,
         apiKey: String
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let allMessages = buildMessagesWithSystemPrompt(messages: messages)
                     let body: [String: Any] = [
                         "model": modelId,
-                        "messages": allMessages,
+                        "messages": messages,
                         "stream": true,
                     ]
                     let request = try makeRequest(
@@ -155,12 +172,9 @@ final class OpenRouterService: Sendable {
                     guard let http = response as? HTTPURLResponse else {
                         throw NetworkError.invalidResponse
                     }
-
                     guard (200...299).contains(http.statusCode) else {
                         var bodyText = ""
-                        for try await line in bytes.lines {
-                            bodyText += line + "\n"
-                        }
+                        for try await line in bytes.lines { bodyText += line + "\n" }
                         throw NetworkError.httpError(
                             http.statusCode,
                             bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -190,15 +204,15 @@ final class OpenRouterService: Sendable {
 
     // MARK: - Private
 
-    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]])
-        -> [[String: String]]
+    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: Any]])
+        -> [[String: Any]]
     {
         let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         var finalSystemPrompt = systemPrompt
         if !customPrompt.isEmpty {
             finalSystemPrompt += "\n\n# Custom Instructions\n\(customPrompt)"
         }
-        var all = [["role": "system", "content": finalSystemPrompt]]
+        var all: [[String: Any]] = [["role": "system", "content": finalSystemPrompt]]
         all.append(contentsOf: messages)
         return all
     }
@@ -209,14 +223,9 @@ final class OpenRouterService: Sendable {
         body: [String: Any]?,
         apiKey: String
     ) throws -> URLRequest {
-        // 空白・改行を除去してから使用
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedKey.isEmpty else {
-            throw NetworkError.missingAPIKey
-        }
-        guard let url = URL(string: "\(baseURL)\(path)") else {
-            throw NetworkError.invalidResponse
-        }
+        guard !trimmedKey.isEmpty else { throw NetworkError.missingAPIKey }
+        guard let url = URL(string: "\(baseURL)\(path)") else { throw NetworkError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
