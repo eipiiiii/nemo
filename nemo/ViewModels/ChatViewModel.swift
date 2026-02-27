@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import SwiftData
 import SwiftUI
-import os
 
 @MainActor
 final class ChatViewModel: ObservableObject {
@@ -75,7 +74,10 @@ final class ChatViewModel: ObservableObject {
         loadMessages()
         messageText = ""
 
-        let historyMessages: [[String: Any]] = messages.map { ["role": $0.role, "content": $0.content] }
+        // API 送信用: tool_use ブロックは除外して user/assistant のみ使う
+        let historyMessages: [[String: Any]] = messages
+            .filter { $0.role != "tool_use" }
+            .map { ["role": $0.role, "content": $0.content] }
 
         isStreaming = true
         streamingContent = ""
@@ -134,6 +136,7 @@ final class ChatViewModel: ObservableObject {
             if let toolCalls = choice.message.tool_calls, !toolCalls.isEmpty {
                 AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.function.name }.joined(separator: ", "))")
 
+                // assistant の tool_calls メッセージをコンテキストに追加
                 var assistantMsg: [String: Any] = ["role": "assistant"]
                 if let content = choice.message.content { assistantMsg["content"] = content }
                 let toolCallsJSON = toolCalls.map { tc -> [String: Any] in
@@ -152,12 +155,29 @@ final class ChatViewModel: ObservableObject {
                 for toolCall in toolCalls {
                     toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
                     AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
+
                     let result = await toolService.execute(
                         toolCallId: toolCall.id,
                         name: toolCall.function.name,
                         arguments: toolCall.function.arguments
                     )
                     AppLogger.tool.info("✅ tool 結果: \(result.content)")
+
+                    // SwiftData に tool_use ブロックとして保存
+                    let toolBlock = Conversation(
+                        id: UUID(),
+                        role: "tool_use",
+                        content: "",
+                        timestamp: Date(),
+                        conversationId: conversationId,
+                        toolName: result.name,
+                        toolResult: result.content
+                    )
+                    modelContext.insert(toolBlock)
+                    try? modelContext.save()
+                    loadMessages()
+
+                    // API コンテキストに tool 結果を追加
                     messages.append([
                         "role": "tool",
                         "tool_call_id": result.toolCallId,
