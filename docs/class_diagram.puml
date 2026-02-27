@@ -70,32 +70,34 @@ package "ViewModels" {
         + createNewConversation(in:) -> UUID
         + deleteConversation(conversationId:in:from:)
         + deleteConversations(at:in:from:)
+        + buildConversationTitles(from:) -> [(UUID, String, Date)]
     }
 
     class ChatViewModel <<@MainActor, ObservableObject>> {
         - conversationId: UUID
-        - model: ModelContext
-        - service: OpenRouterService
-        - selectedModelKey: String
+        - modelContext: ModelContext
+        - openRouterService: OpenRouterService
+        - keychain: KeychainService
+        - apiKeyKeychainKey: String
+        - streamingTask: Task<Void, Never>?
         --
         + messageText: String <<@Published>>
         + messages: [Conversation] <<@Published>>
         + isLoading: Bool <<@Published>>
         + errorMessage: String? <<@Published>>
-        + selectedModelId: String <<@Published>>
         + streamingContent: String <<@Published>>
         + isStreaming: Bool <<@Published>>
         --
         + init(conversationId:modelContext:)
         + loadMessages()
-        + loadSelectedModel()
         + sendMessage()
         + cancelStreaming()
     }
 
     class SettingsViewModel <<@MainActor, ObservableObject>> {
         - service: OpenRouterService
-        - apiKeyKey: String
+        - keychain: KeychainService
+        - apiKeyKeychainKey: String
         - customPromptKey: String
         - selectedModelKey: String
         --
@@ -171,24 +173,35 @@ package "Models" {
 ' ===== Service Layer =====
 package "Services" {
 
-    class OpenRouterService <<Sendable>> {
+    class KeychainService <<final, Sendable>> {
+        - shared: KeychainService <<static>>
+        --
+        + save(_:forKey:) throws
+        + load(forKey:) -> String?
+        + delete(forKey:) throws
+    }
+
+    enum KeychainError <<LocalizedError>> {
+        - saveError(OSStatus)
+        - loadError(OSStatus)
+        - deleteError(OSStatus)
+        - unexpectedData
+        --
+        + errorDescription: String? { get }
+    }
+
+    class OpenRouterService <<final, Sendable>> {
         - baseURL: String
-        - apiKeyKey: String
         - customPromptKey: String
         - systemPrompt: String
         --
-        + getModels() async throws -> [Model]
-        + sendMessage(messages:modelId:) async throws -> String
-        + sendMessageStream(messages:modelId:) async throws -> AsyncThrowingStream<String, Error>
+        + getModels(apiKey:) async throws -> [Model]
+        + sendMessage(messages:modelId:apiKey:) async throws -> String
+        + sendMessageStream(messages:modelId:apiKey:) -> AsyncThrowingStream<String, Error>
     }
 
     struct ModelsResponse <<Codable, Sendable>> {
         - data: [Model]
-    }
-
-    struct ChatRequest <<Codable, Sendable>> {
-        - model: String
-        - messages: [[String: String]]
     }
 
     struct ChatResponse <<Codable, Sendable>> {
@@ -197,21 +210,25 @@ package "Services" {
         + struct Choice
     }
 
-    struct Choice <<Codable, Sendable>> {
-        - message: Message
+    struct StreamChunk <<Codable, Sendable>> {
+        - choices: [Choice]
         --
-        + struct Message
+        + struct Choice
+        + struct Delta
     }
 
-    struct Message <<Codable, Sendable>> {
-        - content: String
+    struct ErrorEnvelope <<Codable, Sendable>> {
+        - error: Inner?
+        --
+        + struct Inner
     }
 
     enum NetworkError <<LocalizedError>> {
         - invalidResponse
-        - httpError(Int)
+        - httpError(Int, String?)
         - noData
         - decodingError(Error)
+        - missingAPIKey
         --
         + errorDescription: String? { get }
     }
@@ -238,23 +255,35 @@ ModelSelectionView --> SettingsViewModel : @ObservedObject
 
 ConversationListViewModel --> Conversation : manages via ModelContext
 ChatViewModel --> OpenRouterService : uses
+ChatViewModel --> KeychainService : reads apiKey
 ChatViewModel --> Conversation : manages via ModelContext
 SettingsViewModel --> OpenRouterService : uses
+SettingsViewModel --> KeychainService : saves/loads apiKey
 SettingsViewModel --> Model : displays
+KeychainError --* KeychainService
 
 note right of ChatViewModel
   @MainActor:
   - 単一会話内のメッセージ管理
-  - ストリーミング対応
-  - async/awaitで非同期処理
+  - ストリーミング対応 (Task)
+  - Keychain経由でAPIキー取得
+  - cancelStreaming()で中断保存
 end note
 
 note right of OpenRouterService
   nonisolated + Sendable:
-  - getModels() / sendMessage()
+  - getModels(apiKey:) / sendMessage()
   - sendMessageStream() for streaming
   - Thread-safeな並列処理
   - MainActor外で実行
+  - APIキーは呼び出し元から受け取る
+end note
+
+note right of KeychainService
+  Singleton (shared):
+  - APIキーをKeychainに安全保存
+  - UserDefaultsは使用しない
+  - save / load / delete
 end note
 
 note left of Item

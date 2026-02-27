@@ -8,7 +8,7 @@ title nemo - State Diagram (Status)
 
 ' ===== ChatViewModel State Machine =====
 state ChatViewModelState {
-    [*] --> Idle : init()
+    [*] --> Idle : init() / loadMessages()
 
     state Idle {
         [*] --> Ready : loadMessages()完了
@@ -24,17 +24,22 @@ state ChatViewModelState {
         state Validating <<entryPoint>> {
             Validating : 入力チェック
             Validating : - messageText.isEmpty
-            Validating : - selectedModelId.isEmpty
+            Validating : - isLoading / isStreaming
+        }
+
+        state KeychainRead {
+            KeychainRead : Keychain.load(apiKey)
+            KeychainRead : apiKeyが空 → エラー
         }
 
         state Sending <<exitPoint>> {
-            Sending : isLoading = true
-            Sending : SwiftDataに保存
+            Sending : isStreaming = true
+            Sending : userMessageをSwiftDataに保存
         }
 
         state AwaitingResponse {
-            AwaitingResponse : API通信中
-            AwaitingResponse : async/await
+            AwaitingResponse : streamingTask実行中
+            AwaitingResponse : async/await (Task)
         }
     }
 
@@ -44,23 +49,28 @@ state ChatViewModelState {
         Streaming : リアルタイム表示中
     }
 
+    state Cancelling {
+        Cancelling : streamingTask?.cancel()
+        Cancelling : 中断済みメッセージ保存 ("*(中断)*")
+    }
+
     state Success {
         [*] --> ResponseReceived
-        ResponseReceived : isLoading = false
+        ResponseReceived : isStreaming = false
         ResponseReceived : assistantメッセージ追加
+        ResponseReceived : streamingContent = ""
     }
 
     state Error {
         state ValidationError {
-            ValidationError : errorMessage = "モデル未選択"
+            ValidationError : errorMessage = "APIキーが設定されていません"
         }
 
         state NetworkError {
-            NetworkError : errorMessage = "通信エラー"
+            NetworkError : errorMessage = error.localizedDescription
         }
 
         state NoInputError {
-            NoInputError : errorMessage = nil
             NoInputError : (早期return)
         }
     }
@@ -69,17 +79,21 @@ state ChatViewModelState {
 ' ===== Transitions =====
 Ready --> Validating : sendMessage()呼び出し
 
-Validating --> NoInputError : [messageText.isEmpty]
-Validating --> ValidationError : [selectedModelId.isEmpty]
-Validating --> Sending : [入力OK]
+Validating --> NoInputError : [messageText.isEmpty / isLoading / isStreaming]
+Validating --> KeychainRead : [入力OK]
+
+KeychainRead --> ValidationError : [apiKey == nil or isEmpty]
+KeychainRead --> Sending : [apiKey有効]
 
 Sending --> AwaitingResponse : Task開始
 AwaitingResponse --> Streaming : ストリーミング開始
 AwaitingResponse --> NetworkError : API失敗/例外
 
+Streaming --> Cancelling : cancelStreaming()呼び出し
 Streaming --> Success : ストリーミング完了
 Streaming --> NetworkError : ストリーミング失敗
 
+Cancelling --> Ready : 中断完了
 ResponseReceived --> Ready : 状態リセット
 NoInputError --> Ready : (即座に戻る)
 ValidationError --> Ready : エラークリア
@@ -90,15 +104,20 @@ state SettingsViewModelState {
     [*] --> SettingsIdle : init() / loadSettings()
 
     state SettingsIdle {
-        SettingsIdle : apiKey: String
-        SettingsIdle : customPrompt: String
+        SettingsIdle : apiKey: Keychain.load()
+        SettingsIdle : customPrompt: UserDefaults
         SettingsIdle : models: []
         SettingsIdle : isLoading = false
     }
 
+    state SavingApiKey {
+        SavingApiKey : apiKey.trimmed
+        SavingApiKey : Keychain.save(apiKey)
+    }
+
     state FetchingModels {
         FetchingModels : isLoading = true
-        FetchingModels : APIキー検証
+        FetchingModels : getModels(apiKey:)
     }
 
     state ModelsLoaded {
@@ -108,7 +127,7 @@ state SettingsViewModelState {
 
     state ModelSelected {
         ModelSelected : selectedModelId: String
-        ModelSelected : 
+        ModelSelected : UserDefaults保存
     }
 
     state SettingsError {
@@ -118,8 +137,12 @@ state SettingsViewModelState {
 }
 
 ' ===== Settings Transitions =====
+SettingsIdle --> SavingApiKey : saveApiKey()
 SettingsIdle --> FetchingModels : fetchModels()
-SettingsIdle --> SettingsError : [apiKey.isEmpty]
+SettingsIdle --> SettingsError : [apiKey.isEmpty on fetchModels]
+
+SavingApiKey --> SettingsIdle : 保存成功
+SavingApiKey --> SettingsError : KeychainError
 
 FetchingModels --> ModelsLoaded : API成功
 FetchingModels --> SettingsError : API失敗
@@ -149,6 +172,7 @@ state ConversationListViewModelState {
     }
 
     state DeletingConversation {
+        DeletingConversation : buildConversationTitles(from:)
         DeletingConversation : SwiftDataから削除
         DeletingConversation : selectedConversationIdクリア
     }
@@ -171,7 +195,8 @@ SettingsPresented --> ListIdle : sheet閉じる
 note right of ChatViewModelState
   主要トリガー:
   - onAppear: loadMessages()
-  - onChange: UI状態更新
+  - sendMessage(): Keychain → API → SwiftData
+  - cancelStreaming(): Task.cancel → 中断保存
   
   @Publishedプロパティ:
   - messageText, messages
@@ -180,10 +205,10 @@ note right of ChatViewModelState
 end note
 
 note right of SettingsViewModelState
-  UserDefaults連携:
-  - openrouter_api_key
-  - custom_prompt
-  - selected_model_id
+  ストレージ分離:
+  - APIキー → Keychain (安全保存)
+  - customPrompt → UserDefaults
+  - selected_model_id → UserDefaults
 end note
 
 note bottom of ConversationListViewModelState
@@ -191,6 +216,8 @@ note bottom of ConversationListViewModelState
   - columnVisibility制御
   - selectedConversationIdで
     detail表示切り替え
+  - buildConversationTitles()で
+    会話リストを動的生成
 end note
 
 @enduml
