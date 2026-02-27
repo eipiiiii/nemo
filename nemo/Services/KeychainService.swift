@@ -1,88 +1,75 @@
-//
-//  KeychainService.swift
-//  nemo
-//
-
 import Foundation
 import Security
-
-enum KeychainError: LocalizedError {
-    case saveError(OSStatus)
-    case loadError(OSStatus)
-    case deleteError(OSStatus)
-    case unexpectedData
-
-    var errorDescription: String? {
-        switch self {
-        case .saveError(let status):
-            return "Keychain への保存に失敗しました (status: \(status))"
-        case .loadError(let status):
-            return "Keychain からの読み込みに失敗しました (status: \(status))"
-        case .deleteError(let status):
-            return "Keychain からの削除に失敗しました (status: \(status))"
-        case .unexpectedData:
-            return "Keychain から予期しないデータが返されました"
-        }
-    }
-}
-
-final class KeychainService: Sendable {
+import os
+final class KeychainService {
     static let shared = KeychainService()
     private init() {}
 
-    // MARK: - Save
-
     func save(_ value: String, forKey key: String) throws {
-        guard let data = value.data(using: .utf8) else { return }
-
-        // 既存のアイテムを削除してから新規保存
-        try? delete(forKey: key)
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        guard let data = value.data(using: .utf8) else {
+            AppLogger.keychain.error("❌ save: UTF-8 変換失敗 key=\(key)")
+            throw KeychainError.encodingFailed
+        }
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: key,
         ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveError(status)
+        SecItemDelete(query as CFDictionary)
+        let attributes: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: key,
+            kSecValueData: data,
+        ]
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        if status == errSecSuccess {
+            AppLogger.keychain.info("✅ save: 成功 key=\(key) 文字数=\(value.count)")
+        } else {
+            AppLogger.keychain.error("❌ save: 失敗 key=\(key) status=\(status)")
+            throw KeychainError.saveFailed(status)
         }
     }
 
-    // MARK: - Load
-
     func load(forKey key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: key,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne,
         ]
-
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let value = String(data: data, encoding: .utf8)
-        else { return nil }
-
-        return value
+        if status == errSecSuccess,
+           let data = result as? Data,
+           let value = String(data: data, encoding: .utf8)
+        {
+            AppLogger.keychain.info("✅ load: 成功 key=\(key) 文字数=\(value.count)")
+            return value
+        } else {
+            AppLogger.keychain.warning("⚠️ load: 値なし key=\(key) status=\(status)")
+            return nil
+        }
     }
 
-    // MARK: - Delete
-
-    func delete(forKey key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key
+    func delete(forKey key: String) {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: key,
         ]
-
         let status = SecItemDelete(query as CFDictionary)
-        // errSecItemNotFound は「存在しなかっただけ」なので無視する
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.deleteError(status)
+        AppLogger.keychain.info("🗑️ delete: key=\(key) status=\(status)")
+    }
+}
+
+enum KeychainError: LocalizedError {
+    case encodingFailed
+    case saveFailed(OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .encodingFailed:
+            return "Keychain: 文字列のエンコードに失敗しました"
+        case .saveFailed(let status):
+            return "Keychain: 保存に失敗しました (status: \(status))"
         }
     }
 }

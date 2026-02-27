@@ -7,3 +7,4 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 buildlog/
+nemo.xcodeproj/xcuserdata/hayashieisuke.xcuserdatad/xcschemes/xcschememanagement.plist

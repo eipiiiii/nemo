@@ -27,10 +27,19 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    // 保存済みメッセージ
                     ForEach(viewModel.messages) { message in
-                        MessageBubbleView(message: message)
-                            .id(message.id)
+                        if message.role == "tool_use" {
+                            ToolCallBubbleView(message: message)
+                                .id(message.id)
+                        } else {
+                            MessageBubbleView(message: message)
+                                .id(message.id)
+                        }
+                    }
+                    // tool 実行中インジケーター
+                    if let status = viewModel.toolCallStatus {
+                        ToolCallProgressView(status: status)
+                            .id("tool_progress")
                     }
                     // ストリーミング中のリアルタイム表示
                     if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
@@ -38,7 +47,7 @@ struct ChatView: View {
                             .id("streaming")
                     }
                     // ストリーミング開始直後（まだ文字が来ていない）
-                    if viewModel.isStreaming && viewModel.streamingContent.isEmpty {
+                    if viewModel.isStreaming && viewModel.streamingContent.isEmpty && viewModel.toolCallStatus == nil {
                         TypingIndicatorView()
                             .id("typing")
                     }
@@ -48,26 +57,39 @@ struct ChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
+            // messages 追加時（次の runloop でスクロール → Publishing changes 警告を回避）
             .onChange(of: viewModel.messages.count) { _, _ in
-                if let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
+                guard let last = viewModel.messages.last else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+            .onChange(of: viewModel.toolCallStatus) { _, status in
+                guard status != nil else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo("tool_progress", anchor: .bottom) }
                 }
             }
             .onChange(of: viewModel.isStreaming) { _, isStreaming in
-                if isStreaming {
+                guard isStreaming else { return }
+                DispatchQueue.main.async {
                     withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
                 }
             }
-            .onChange(of: viewModel.streamingContent) { _, _ in
-                proxy.scrollTo("streaming", anchor: .bottom)
+            // throttleで 120ms 間引き → onChange multiple-per-frame 警告を回避
+            .onReceive(
+                viewModel.$streamingContent
+                    .throttle(for: .milliseconds(120), scheduler: RunLoop.main, latest: true)
+            ) { _ in
+                guard viewModel.isStreaming else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo("streaming", anchor: .bottom)
+                }
             }
             .onChange(of: viewModel.isLoading) { _, isLoading in
-                if !isLoading, let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
+                guard !isLoading, let last = viewModel.messages.last else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
         }
@@ -80,14 +102,13 @@ struct ChatView: View {
     @ViewBuilder
     private var inputBar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // エラー表示
             if let errorMessage = viewModel.errorMessage {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(errorMessage)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Spacer()
                     Button("閉じる") {
                         viewModel.errorMessage = nil
@@ -99,7 +120,6 @@ struct ChatView: View {
                 .background(Color.orange.opacity(0.1))
             }
 
-            // 入力フィールド
             HStack(alignment: .bottom, spacing: 12) {
                 TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -116,14 +136,13 @@ struct ChatView: View {
                     }
                     .disabled(viewModel.isLoading)
 
-                // ストリーミング中はキャンセルボタンを表示
                 if viewModel.isStreaming {
                     Button {
                         viewModel.cancelStreaming()
                     } label: {
                         Image(systemName: "stop.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 4)
@@ -135,7 +154,75 @@ struct ChatView: View {
     }
 }
 
-// ストリーミング中のリアルタイム表示バブル
+// MARK: - Tool Call Bubble（折りたたみ）
+
+struct ToolCallBubbleView: View {
+    let message: Conversation
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        HStack(alignment: .top) {
+            DisclosureGroup(
+                isExpanded: $isExpanded,
+                content: {
+                    if let result = message.toolResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .padding(.top, 2)
+                    }
+                },
+                label: {
+                    Label {
+                        Text(message.toolName ?? "tool")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "wrench.and.screwdriver")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(.separator, lineWidth: 0.5)
+            }
+            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+
+            Spacer(minLength: 60)
+        }
+    }
+}
+
+// MARK: - Tool 実行中インジケーター
+
+struct ToolCallProgressView: View {
+    let status: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 14, height: 14)
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Streaming Bubble
+
 struct StreamingBubbleView: View {
     let content: String
 
@@ -158,7 +245,8 @@ struct StreamingBubbleView: View {
     }
 }
 
-// 応答待ちのインジケーター（3点ドット）
+// MARK: - Typing Indicator
+
 struct TypingIndicatorView: View {
     @State private var dotCount = 0
     private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
@@ -167,7 +255,7 @@ struct TypingIndicatorView: View {
         HStack(alignment: .top, spacing: 0) {
             Text(String(repeating: "●", count: dotCount + 1))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .onReceive(timer) { _ in
@@ -177,6 +265,8 @@ struct TypingIndicatorView: View {
         }
     }
 }
+
+// MARK: - Message Bubble
 
 struct MessageBubbleView: View {
     let message: Conversation
@@ -192,9 +282,8 @@ struct MessageBubbleView: View {
                     Text(message.content)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .foregroundColor(.primary)
-                        .background(Color.gray.opacity(0.25))
-                        .cornerRadius(18)
+                        .foregroundStyle(.primary)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
                 } else {
                     Markdown(message.content)
                         .markdownTheme(
@@ -226,11 +315,15 @@ struct MessageBubbleView: View {
     let conversationId = UUID()
     let messages: [Conversation] = [
         Conversation(
-            id: UUID(), role: "user", content: "こんにちは！このアプリはどんなことができますか？", timestamp: Date(),
+            id: UUID(), role: "user", content: "現在時刻を教えて", timestamp: Date(),
             conversationId: conversationId),
         Conversation(
+            id: UUID(), role: "tool_use", content: "", timestamp: Date(),
+            conversationId: conversationId, toolName: "get_current_time",
+            toolResult: "2026年02月27日 11:17:59 (金曜日)"),
+        Conversation(
             id: UUID(), role: "assistant",
-            content: "こんにちは！このアプリではチャット形式でやり取りができます。メッセージを入力して送信すると、ここに返信が表示されます。",
+            content: "現在の時刻は **2026年02月27日 11:17:59（金曜日）** です。",
             timestamp: Date(), conversationId: conversationId),
     ]
 

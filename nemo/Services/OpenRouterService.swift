@@ -1,22 +1,37 @@
 import Foundation
+import OSLog
 
 // 通信専用の型定義です
 nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
 
-// 非ストリーミング用レスポンス
+// 非ストリーミング用レスポンス（tool call 対応）
 nonisolated struct ChatResponse: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Message: Decodable, Sendable {
-            let content: String
+            let role: String?
+            let content: String?
+            let tool_calls: [ToolCallResponse]?
         }
         let message: Message
+        let finish_reason: String?
     }
     let choices: [Choice]
 }
 
-// ストリーミング用チャンク（OpenAI互换: choices[0].delta.content）
+// tool_calls レスポンス型
+nonisolated struct ToolCallResponse: Decodable, Sendable {
+    struct Function: Decodable, Sendable {
+        let name: String
+        let arguments: String
+    }
+    let id: String
+    let type: String?
+    let function: Function
+}
+
+// ストリーミング用チャンク
 nonisolated struct StreamChunk: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Delta: Decodable, Sendable {
@@ -90,58 +105,85 @@ final class OpenRouterService: Sendable {
         """
 
     nonisolated func getModels(apiKey: String) async throws -> [Model] {
+        AppLogger.network.info("📡 getModels 開始")
         let request = try makeRequest(path: "/models", httpMethod: "GET", body: nil, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
+        AppLogger.network.info("📡 getModels ステータス: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else {
-            throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
+            let msg = decodeErrorMessage(data) ?? ""
+            AppLogger.network.error("❌ getModels エラー: \(http.statusCode) \(msg)")
+            throw NetworkError.httpError(http.statusCode, msg)
         }
         do {
-            return try JSONDecoder().decode(ModelsResponse.self, from: data).data
+            let models = try JSONDecoder().decode(ModelsResponse.self, from: data).data
+            AppLogger.network.info("✅ getModels 完了: \(models.count) 件")
+            return models
         } catch {
+            AppLogger.network.error("❌ getModels デコード失敗: \(error)")
             throw NetworkError.decodingError(error)
         }
     }
 
-    nonisolated func sendMessage(
-        messages: [[String: String]],
+    /// tool call ループ用: 非ストリーミング1ターン送信
+    nonisolated func sendMessageWithTools(
+        messages: [[String: Any]],
         modelId: String,
+        tools: [ToolDefinition],
         apiKey: String
-    ) async throws -> String {
-        let allMessages = buildMessagesWithSystemPrompt(messages: messages)
-        let body: [String: Any] = [
+    ) async throws -> ChatResponse.Choice {
+        AppLogger.network.info("📤 sendMessageWithTools 開始 model=\(modelId) messages=\(messages.count)件 tools=\(tools.count)件")
+
+        var body: [String: Any] = [
             "model": modelId,
-            "messages": allMessages,
+            "messages": messages,
         ]
+        if !tools.isEmpty {
+            let encoder = JSONEncoder()
+            let toolsData = try encoder.encode(tools)
+            let toolsJSON = try JSONSerialization.jsonObject(with: toolsData)
+            body["tools"] = toolsJSON
+            body["tool_choice"] = "auto"
+        }
+
         let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
+
+        AppLogger.network.info("📥 sendMessageWithTools ステータス: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else {
-            throw NetworkError.httpError(http.statusCode, decodeErrorMessage(data))
+            let msg = decodeErrorMessage(data) ?? ""
+            AppLogger.network.error("❌ sendMessageWithTools エラー: \(http.statusCode) \(msg)")
+            throw NetworkError.httpError(http.statusCode, msg)
         }
+
         do {
             let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
-            guard let content = decoded.choices.first?.message.content, !content.isEmpty else {
-                throw NetworkError.noData
-            }
-            return content
+            guard let choice = decoded.choices.first else { throw NetworkError.noData }
+            let toolCallCount = choice.message.tool_calls?.count ?? 0
+            AppLogger.network.info("✅ sendMessageWithTools 完了: finish_reason=\(choice.finish_reason ?? "nil") tool_calls=\(toolCallCount)件")
+            return choice
         } catch {
+            // デコード失敗時は生の JSON もログに出す
+            let raw = String(data: data, encoding: .utf8) ?? "(binary)"
+            AppLogger.network.error("❌ sendMessageWithTools デコード失敗: \(error)\nRaw: \(raw)")
             throw NetworkError.decodingError(error)
         }
     }
 
+    // ストリーミング（最終回答用）
     nonisolated func sendMessageStream(
-        messages: [[String: String]],
+        messages: [[String: Any]],
         modelId: String,
         apiKey: String
     ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
+        AppLogger.streaming.info("🌊 sendMessageStream 開始 model=\(modelId) messages=\(messages.count)件")
+        return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let allMessages = buildMessagesWithSystemPrompt(messages: messages)
                     let body: [String: Any] = [
                         "model": modelId,
-                        "messages": allMessages,
+                        "messages": messages,
                         "stream": true,
                     ]
                     let request = try makeRequest(
@@ -155,33 +197,37 @@ final class OpenRouterService: Sendable {
                     guard let http = response as? HTTPURLResponse else {
                         throw NetworkError.invalidResponse
                     }
-
+                    AppLogger.streaming.info("🌊 SSE 接続: status=\(http.statusCode)")
                     guard (200...299).contains(http.statusCode) else {
                         var bodyText = ""
-                        for try await line in bytes.lines {
-                            bodyText += line + "\n"
-                        }
-                        throw NetworkError.httpError(
-                            http.statusCode,
-                            bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        )
+                        for try await line in bytes.lines { bodyText += line + "\n" }
+                        let trimmed = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        AppLogger.streaming.error("❌ SSE エラー: \(http.statusCode) \(trimmed)")
+                        throw NetworkError.httpError(http.statusCode, trimmed)
                     }
 
+                    var chunkCount = 0
                     for try await line in bytes.lines {
                         if line.hasPrefix(":") || line.isEmpty { continue }
                         guard line.hasPrefix("data: ") else { continue }
                         let payload = String(line.dropFirst(6))
-                        if payload == "[DONE]" { break }
+                        if payload == "[DONE]" {
+                            AppLogger.streaming.info("🌊 SSE [DONE] 受信 chunks=\(chunkCount)")
+                            break
+                        }
                         guard let data = payload.data(using: .utf8) else { continue }
                         if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
                             let delta = chunk.choices.first?.delta?.content,
                             !delta.isEmpty
                         {
+                            chunkCount += 1
                             continuation.yield(delta)
                         }
                     }
+                    AppLogger.streaming.info("✅ sendMessageStream 完了: 合計 \(chunkCount) chunks")
                     continuation.finish()
                 } catch {
+                    AppLogger.streaming.error("❌ sendMessageStream エラー: \(error)")
                     continuation.finish(throwing: error)
                 }
             }
@@ -190,37 +236,26 @@ final class OpenRouterService: Sendable {
 
     // MARK: - Private
 
-    private nonisolated func buildMessagesWithSystemPrompt(messages: [[String: String]])
-        -> [[String: String]]
-    {
-        let customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
-        var finalSystemPrompt = systemPrompt
-        if !customPrompt.isEmpty {
-            finalSystemPrompt += "\n\n# Custom Instructions\n\(customPrompt)"
-        }
-        var all = [["role": "system", "content": finalSystemPrompt]]
-        all.append(contentsOf: messages)
-        return all
-    }
-
     private nonisolated func makeRequest(
         path: String,
         httpMethod: String,
         body: [String: Any]?,
         apiKey: String
     ) throws -> URLRequest {
-        // 空白・改行を除去してから使用
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else {
+            AppLogger.network.error("❌ makeRequest: APIキーなし")
             throw NetworkError.missingAPIKey
         }
         guard let url = URL(string: "\(baseURL)\(path)") else {
+            AppLogger.network.error("❌ makeRequest: 無効な URL: \(self.baseURL)\(path)")
             throw NetworkError.invalidResponse
         }
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        AppLogger.network.debug("🔧 makeRequest: \(httpMethod) \(path) keyLen=\(trimmedKey.count)")
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         }
