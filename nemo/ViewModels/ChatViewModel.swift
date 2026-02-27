@@ -21,7 +21,7 @@ final class ChatViewModel: ObservableObject {
     private let conversationId: UUID
     private let modelContext: ModelContext
     private let openRouterService = OpenRouterService()
-    private let toolService = ToolService.shared
+    private let toolRegistry = ToolRegistry.shared
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
 
@@ -113,7 +113,7 @@ final class ChatViewModel: ObservableObject {
         apiKey: String
     ) async throws {
         var messages = buildMessagesWithSystemPrompt(initialMessages)
-        let tools = toolService.availableTools
+        let tools = toolRegistry.availableTools
 
         AppLogger.chat.info("🤖 runAgentLoop 開始: maxRounds=\(self.maxToolRounds) tools=\(tools.count)件")
 
@@ -157,7 +157,7 @@ final class ChatViewModel: ObservableObject {
                     toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
                     AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
 
-                    let result = await toolService.execute(
+                    let result = await toolRegistry.execute(
                         toolCallId: toolCall.id,
                         name: toolCall.function.name,
                         arguments: toolCall.function.arguments
