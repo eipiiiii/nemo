@@ -27,7 +27,6 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    // 保存済みメッセージ
                     ForEach(viewModel.messages) { message in
                         if message.role == "tool_use" {
                             ToolCallBubbleView(message: message)
@@ -58,31 +57,39 @@ struct ChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
+            // messages 追加時（次の runloop でスクロール → Publishing changes 警告を回避）
             .onChange(of: viewModel.messages.count) { _, _ in
-                if let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
+                guard let last = viewModel.messages.last else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
             .onChange(of: viewModel.toolCallStatus) { _, status in
-                if status != nil {
+                guard status != nil else { return }
+                DispatchQueue.main.async {
                     withAnimation { proxy.scrollTo("tool_progress", anchor: .bottom) }
                 }
             }
             .onChange(of: viewModel.isStreaming) { _, isStreaming in
-                if isStreaming {
+                guard isStreaming else { return }
+                DispatchQueue.main.async {
                     withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
                 }
             }
-            .onChange(of: viewModel.streamingContent) { _, _ in
-                proxy.scrollTo("streaming", anchor: .bottom)
+            // throttleで 120ms 間引き → onChange multiple-per-frame 警告を回避
+            .onReceive(
+                viewModel.$streamingContent
+                    .throttle(for: .milliseconds(120), scheduler: RunLoop.main, latest: true)
+            ) { _ in
+                guard viewModel.isStreaming else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo("streaming", anchor: .bottom)
+                }
             }
             .onChange(of: viewModel.isLoading) { _, isLoading in
-                if !isLoading, let lastMessage = viewModel.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
+                guard !isLoading, let last = viewModel.messages.last else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
         }
@@ -96,12 +103,12 @@ struct ChatView: View {
     private var inputBar: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let errorMessage = viewModel.errorMessage {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(errorMessage)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Spacer()
                     Button("閉じる") {
                         viewModel.errorMessage = nil
@@ -135,7 +142,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "stop.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 4)
@@ -154,48 +161,40 @@ struct ToolCallBubbleView: View {
     @State private var isExpanded: Bool = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                // ヘッダー（常に表示）
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "wrench.and.screwdriver")
+        HStack(alignment: .top) {
+            DisclosureGroup(
+                isExpanded: $isExpanded,
+                content: {
+                    if let result = message.toolResult {
+                        Text(result)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .padding(.top, 2)
+                    }
+                },
+                label: {
+                    Label {
                         Text(message.toolName ?? "tool")
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "wrench.and.screwdriver")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
                 }
-                .buttonStyle(.plain)
-
-                // 結果（展開時のみ表示）
-                if isExpanded, let result = message.toolResult {
-                    Text(result)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 6)
-                        .textSelection(.enabled)
-                }
-            }
-            .background(Color.secondary.opacity(0.08))
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
             )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(.separator, lineWidth: 0.5)
+            }
+            .animation(.easeInOut(duration: 0.2), value: isExpanded)
 
             Spacer(minLength: 60)
         }
@@ -208,12 +207,13 @@ struct ToolCallProgressView: View {
     let status: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ProgressView()
-                .scaleEffect(0.7)
+                .controlSize(.small)
+                .frame(width: 14, height: 14)
             Text(status)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 14)
@@ -255,7 +255,7 @@ struct TypingIndicatorView: View {
         HStack(alignment: .top, spacing: 0) {
             Text(String(repeating: "●", count: dotCount + 1))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .onReceive(timer) { _ in
@@ -282,9 +282,8 @@ struct MessageBubbleView: View {
                     Text(message.content)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .foregroundColor(.primary)
-                        .background(Color.gray.opacity(0.25))
-                        .cornerRadius(18)
+                        .foregroundStyle(.primary)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
                 } else {
                     Markdown(message.content)
                         .markdownTheme(
