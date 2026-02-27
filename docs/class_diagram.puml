@@ -45,6 +45,12 @@ package "Views" {
         + body: some View
     }
 
+    struct ToolCallBlockView <<SwiftUI.View>> {
+        - block: ToolCallBlock
+        --
+        + body: some View
+    }
+
     struct StreamingBubbleView <<SwiftUI.View>> {
         - content: String
         --
@@ -78,6 +84,7 @@ package "ViewModels" {
         - modelContext: ModelContext
         - openRouterService: OpenRouterService
         - keychain: KeychainService
+        - toolService: ToolService
         - apiKeyKeychainKey: String
         - streamingTask: Task<Void, Never>?
         --
@@ -92,6 +99,7 @@ package "ViewModels" {
         + loadMessages()
         + sendMessage()
         + cancelStreaming()
+        - runToolLoop(apiKey:modelId:history:) async throws -> String
     }
 
     class SettingsViewModel <<@MainActor, ObservableObject>> {
@@ -126,8 +134,19 @@ package "Models" {
         - content: String
         - timestamp: Date
         - conversationId: UUID
+        - toolCallBlocks: [ToolCallBlock]
         --
         + init(id:role:content:timestamp:conversationId:)
+    }
+
+    class ToolCallBlock <<@Model>> {
+        - id: UUID
+        - toolName: String
+        - arguments: String
+        - result: String
+        - conversation: Conversation?
+        --
+        + init(id:toolName:arguments:result:)
     }
 
     class Item <<@Model>> {
@@ -190,6 +209,14 @@ package "Services" {
         + errorDescription: String? { get }
     }
 
+    class ToolService <<final, Sendable>> {
+        + toolDefinitions: [[String: Any]] { get }
+        --
+        + execute(toolName:arguments:) async -> String
+        - getCurrentTime() -> String
+        - getWeather(arguments:) -> String
+    }
+
     class OpenRouterService <<final, Sendable>> {
         - baseURL: String
         - customPromptKey: String
@@ -198,6 +225,7 @@ package "Services" {
         + getModels(apiKey:) async throws -> [Model]
         + sendMessage(messages:modelId:apiKey:) async throws -> String
         + sendMessageStream(messages:modelId:apiKey:) -> AsyncThrowingStream<String, Error>
+        + sendMessageWithTools(messages:modelId:apiKey:tools:) async throws -> ToolsResponse
     }
 
     struct ModelsResponse <<Codable, Sendable>> {
@@ -208,6 +236,14 @@ package "Services" {
         - choices: [Choice]
         --
         + struct Choice
+    }
+
+    struct ToolsResponse <<Codable, Sendable>> {
+        - choices: [Choice]
+        --
+        + struct Choice
+        + struct Message
+        + struct ToolCall
     }
 
     struct StreamChunk <<Codable, Sendable>> {
@@ -232,12 +268,24 @@ package "Services" {
         --
         + errorDescription: String? { get }
     }
+
+    enum AppLogger {
+        - subsystem: String <<private static>>
+        --
+        + network: Logger <<nonisolated(unsafe) static>>
+        + tool: Logger <<nonisolated(unsafe) static>>
+        + keychain: Logger <<nonisolated(unsafe) static>>
+        + chat: Logger <<nonisolated(unsafe) static>>
+        + settings: Logger <<nonisolated(unsafe) static>>
+        + streaming: Logger <<nonisolated(unsafe) static>>
+    }
 }
 
 ' ===== Dependencies =====
 
 nemoApp --> ContentView : WindowGroup
 nemoApp --> Conversation : ModelContainer
+nemoApp --> ToolCallBlock : ModelContainer
 
 ContentView --> ConversationListViewModel : @StateObject
 ContentView --> ChatView : NavigationSplitView detail
@@ -246,8 +294,11 @@ ContentView *--> Conversation : @Query
 
 ChatView *--> ChatViewModel : @StateObject
 ChatView --> MessageBubbleView : embeds
+ChatView --> ToolCallBlockView : embeds
 ChatView --> StreamingBubbleView : embeds
 ChatView --> TypingIndicatorView : embeds
+
+MessageBubbleView --> ToolCallBlockView : embeds (toolCallBlocks)
 
 SettingsView *--> SettingsViewModel : @StateObject
 SettingsView --> ModelSelectionView : sheet
@@ -256,11 +307,14 @@ ModelSelectionView --> SettingsViewModel : @ObservedObject
 ConversationListViewModel --> Conversation : manages via ModelContext
 ChatViewModel --> OpenRouterService : uses
 ChatViewModel --> KeychainService : reads apiKey
+ChatViewModel --> ToolService : executes tools
 ChatViewModel --> Conversation : manages via ModelContext
+ChatViewModel --> ToolCallBlock : manages via ModelContext
 SettingsViewModel --> OpenRouterService : uses
 SettingsViewModel --> KeychainService : saves/loads apiKey
 SettingsViewModel --> Model : displays
 KeychainError --* KeychainService
+Conversation "1" *-- "0..*" ToolCallBlock : toolCallBlocks
 
 note right of ChatViewModel
   @MainActor:
@@ -268,15 +322,24 @@ note right of ChatViewModel
   - ストリーミング対応 (Task)
   - Keychain経由でAPIキー取得
   - cancelStreaming()で中断保存
+  - runToolLoop()でtool useループ管理
 end note
 
 note right of OpenRouterService
   nonisolated + Sendable:
   - getModels(apiKey:) / sendMessage()
   - sendMessageStream() for streaming
+  - sendMessageWithTools() for tool use
   - Thread-safeな並列処理
-  - MainActor外で実行
   - APIキーは呼び出し元から受け取る
+end note
+
+note right of ToolService
+  Sendable:
+  - toolDefinitions: OpenRouter向けJSON定義
+  - execute(): tool名でdispatch
+  - 現在実装: get_current_time, get_weather
+  - 将来拡張: web_search, read_file 等
 end note
 
 note right of KeychainService

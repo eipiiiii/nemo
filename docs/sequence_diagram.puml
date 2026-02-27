@@ -12,6 +12,7 @@ participant "ChatView\n(SwiftUI View)" as View <<@MainActor>>
 participant "ChatViewModel\n(@MainActor)" as VM <<@MainActor>>
 participant "ModelContext\n(SwiftData)" as Context
 participant "KeychainService\n(Singleton)" as Keychain
+participant "ToolService\n(Sendable)" as Tools
 participant "OpenRouterService\n(Sendable)" as Service <<nonisolated>>
 participant "OpenRouter API" as API
 
@@ -36,8 +37,8 @@ group 1. 初期化フロー (onAppear)
     deactivate View
 end
 
-' === メッセージ送信フロー ===
-group 2. メッセージ送信フロー (async/await)
+' === メッセージ送信フロー (streaming) ===
+group 2. メッセージ送信フロー (ストリーミング)
     User -> View : メッセージ入力
     activate View
     View -> VM : messageText更新 [@Binding]
@@ -50,7 +51,6 @@ group 2. メッセージ送信フロー (async/await)
         end
     end
     
-    ' ===== APIキー取得 (Keychain) =====
     VM -> Keychain : load(forKey: "openrouter_api_key")
     activate Keychain
     Keychain --> VM : apiKey? (String?)
@@ -61,39 +61,25 @@ group 2. メッセージ送信フロー (async/await)
         VM --> View : エラー表示
     end
     
-    ' ===== ユーザー メッセージ保存 =====
     VM -> VM : userMessage作成
-    VM -> Context : insert(userMessage)
+    VM -> Context : insert(userMessage) / save()
     activate Context
-    VM -> Context : save()
     Context --> VM : 
     deactivate Context
     VM -> VM : loadMessages()
     
-    VM -> VM : messages updated [@Published]
-    VM --> View : UI自動更新
-    VM -> VM : messageText = ""
-    
-    ' ===== ストリーミング開始 =====
     VM -> VM : isStreaming = true [@Published]
     VM -> VM : streamingContent = ""
     VM --> View : タイピングインジケーター表示
     
-    ' ===== API通信 (非同期ストリーミング) =====
     VM -> Service : sendMessageStream(messages:modelId:apiKey:)
     activate Service
-    
-    note right: nonisolated関数 / Task内で実行
-    
-    Service -> Service : buildMessagesWithSystemPrompt()
-    Service -> Service : URLRequest作成 (Bearer apiKey)
     
     Service -> API : POST /chat/completions (stream: true)
     activate API
     
     loop ストリーミングチャンク
         API --> Service : SSE chunk (data: {...})
-        Service -> Service : JSONDecoder → StreamChunk
         Service --> VM : delta.content (chunk)
         VM -> VM : streamingContent += chunk [@Published]
         VM --> View : リアルタイム表示
@@ -104,21 +90,12 @@ group 2. メッセージ送信フロー (async/await)
     Service --> VM : continuation.finish()
     deactivate Service
     
-    note right: MainActorに自動復帰
-    
-    ' ===== ストリーミング終了 =====
     VM -> VM : isStreaming = false [@Published]
-    VM --> View : タイピングインジケーター非表示
-    
-    ' ===== AI応答保存 =====
     VM -> VM : assistantMessage作成
-    VM -> Context : insert(assistantMessage)
+    VM -> Context : insert(assistantMessage) / save()
     activate Context
-    VM -> Context : save()
     Context --> VM : 
     deactivate Context
-    VM -> VM : loadMessages()
-    
     VM -> VM : streamingContent = "" [@Published]
     VM --> View : UI自動更新
     
@@ -127,8 +104,64 @@ group 2. メッセージ送信フロー (async/await)
     deactivate View
 end
 
+' === Tool Use フロー ===
+group 3. Tool Use フロー (Agent Loop)
+    User -> View : tool呼び出しが必要なメッセージ入力
+    activate View
+    View -> VM : sendMessage()
+    activate VM
+    
+    VM -> Keychain : load(forKey: "openrouter_api_key")
+    activate Keychain
+    Keychain --> VM : apiKey
+    deactivate Keychain
+    
+    VM -> VM : runToolLoop(apiKey:modelId:history:)
+    
+    loop finish_reason == "tool_calls"
+        VM -> Service : sendMessageWithTools(messages:modelId:apiKey:tools:)
+        activate Service
+        Service -> API : POST /chat/completions (tools: [...])
+        activate API
+        API --> Service : ToolsResponse (finish_reason: "tool_calls")
+        deactivate API
+        Service --> VM : ToolsResponse
+        deactivate Service
+        
+        loop 各 tool_call
+            VM -> Tools : execute(toolName:arguments:)
+            activate Tools
+            Tools --> VM : result: String
+            deactivate Tools
+            VM -> VM : history に tool_call + tool result を追加
+            VM -> VM : ToolCallBlock 作成・SwiftData保存
+            VM -> Context : insert(toolCallBlock) / save()
+            activate Context
+            Context --> VM : 
+            deactivate Context
+        end
+    end
+    
+    note right of VM
+      finish_reason == "stop" になるまで
+      ループを繰り返す
+    end note
+    
+    VM -> VM : assistantMessage作成 (最終応答)
+    VM -> Context : insert(assistantMessage) / save()
+    activate Context
+    Context --> VM : 
+    deactivate Context
+    VM -> VM : loadMessages()
+    VM --> View : UI自動更新
+    
+    deactivate VM
+    View --> User : tool結果付き応答表示
+    deactivate View
+end
+
 ' === キャンセルフロー ===
-group 3. キャンセルフロー (cancelStreaming)
+group 4. キャンセルフロー (cancelStreaming)
     User -> View : キャンセルボタン押下
     activate View
     View -> VM : cancelStreaming()
@@ -138,9 +171,8 @@ group 3. キャンセルフロー (cancelStreaming)
     
     opt streamingContent.isEmpty == false
         VM -> VM : assistantMessage作成 (content + " *(中断)*")
-        VM -> Context : insert(assistantMessage)
+        VM -> Context : insert(assistantMessage) / save()
         activate Context
-        VM -> Context : save()
         Context --> VM : 
         deactivate Context
         VM -> VM : loadMessages()
@@ -155,13 +187,13 @@ group 3. キャンセルフロー (cancelStreaming)
 end
 
 ' === エラーハンドリングフロー ===
-group 4. エラーハンドリングフロー
+group 5. エラーハンドリングフロー
     User -> View : メッセージ送信
     activate View
     View -> VM : sendMessage()
     activate VM
     
-    VM -> Service : sendMessageStream(messages:modelId:apiKey:)
+    VM -> Service : sendMessageStream() or sendMessageWithTools()
     activate Service
     
     Service -> API : POST /chat/completions
@@ -182,7 +214,7 @@ group 4. エラーハンドリングフロー
 end
 
 ' === 設定変更フロー ===
-group 5. 設定変更フロー
+group 6. 設定変更フロー
     participant "SettingsView\n(@MainActor)" as SView <<@MainActor>>
     participant "SettingsViewModel\n(@MainActor)" as SVM <<@MainActor>>
     
@@ -200,7 +232,6 @@ group 5. 設定変更フロー
     
     User -> SView : APIキー入力 → 保存
     SView -> SVM : saveApiKey()
-    SVM -> SVM : trim apiKey
     SVM -> Keychain : save(apiKey, forKey: "openrouter_api_key")
     activate Keychain
     Keychain --> SVM : (success / throws)
@@ -232,7 +263,7 @@ group 5. 設定変更フロー
 end
 
 ' === 会話削除フロー ===
-group 6. 会話削除フロー
+group 7. 会話削除フロー
     participant "ContentView\n(@MainActor)" as CView <<@MainActor>>
     participant "ConversationListViewModel\n(@MainActor)" as CLVM <<@MainActor>>
     
@@ -262,13 +293,21 @@ note right of VM
   - @Published変更でView自動更新
   - streamingTask: Task<Void, Never>
   - APIキーはKeychainから取得
+  - runToolLoop()でtool useを管理
+end note
+
+note right of Tools
+  ToolService (Sendable):
+  - get_current_time: 現在日時を返す
+  - get_weather: 天気スタブを返す
+  - 将来拡張: web_search, read_file 等
 end note
 
 note right of Service
   nonisolated + Sendable:
-  - getModels(apiKey:) / sendMessage(apiKey:)
-  - sendMessageStream(apiKey:) for streaming
-  - Thread-safeな並列処理
+  - getModels(apiKey:) / sendMessage()
+  - sendMessageStream() for streaming
+  - sendMessageWithTools() for tool use
   - APIキーは引数で受け取る
 end note
 
@@ -282,6 +321,7 @@ note right of API
   OpenRouter API:
   - /models: モデル一覧取得
   - /chat/completions: チャット応答 (SSE)
+  - /chat/completions: tool use (tools: [...])
 end note
 
 @enduml

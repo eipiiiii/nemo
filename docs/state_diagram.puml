@@ -49,6 +49,14 @@ state ChatViewModelState {
         Streaming : リアルタイム表示中
     }
 
+    state ToolLoop {
+        ToolLoop : sendMessageWithTools()呼び出し
+        ToolLoop : finish_reason == "tool_calls"
+        ToolLoop : ToolService.execute()で各ツール実行
+        ToolLoop : ToolCallBlock作成・SwiftData保存
+        ToolLoop : historyにtool結果を追加して再リクエスト
+    }
+
     state Cancelling {
         Cancelling : streamingTask?.cancel()
         Cancelling : 中断済みメッセージ保存 ("*(中断)*")
@@ -86,12 +94,17 @@ KeychainRead --> ValidationError : [apiKey == nil or isEmpty]
 KeychainRead --> Sending : [apiKey有効]
 
 Sending --> AwaitingResponse : Task開始
-AwaitingResponse --> Streaming : ストリーミング開始
+AwaitingResponse --> Streaming : ストリーミング開始 (stream: true)
+AwaitingResponse --> ToolLoop : tool useモデル選択時
 AwaitingResponse --> NetworkError : API失敗/例外
 
 Streaming --> Cancelling : cancelStreaming()呼び出し
 Streaming --> Success : ストリーミング完了
 Streaming --> NetworkError : ストリーミング失敗
+
+ToolLoop --> ToolLoop : [finish_reason == "tool_calls"] ループ継続
+ToolLoop --> Success : [finish_reason == "stop"] ループ終了
+ToolLoop --> NetworkError : API失敗/例外
 
 Cancelling --> Ready : 中断完了
 ResponseReceived --> Ready : 状態リセット
@@ -197,6 +210,7 @@ note right of ChatViewModelState
   - onAppear: loadMessages()
   - sendMessage(): Keychain → API → SwiftData
   - cancelStreaming(): Task.cancel → 中断保存
+  - runToolLoop(): tool use agent loop
   
   @Publishedプロパティ:
   - messageText, messages
