@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import SwiftData
 import SwiftUI
+import os
 
 @MainActor
 final class ChatViewModel: ObservableObject {
