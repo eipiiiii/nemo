@@ -1,5 +1,5 @@
+import AppKit
 import Foundation
-import UIKit
 import os
 
 struct OpenURLTool: NemoTool {
@@ -8,7 +8,7 @@ struct OpenURLTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "open_url",
-                description: "Safari で URL を開きます。ユーザーが特定の Web ページやドキュメントを開いたいときに使ってください。",
+                description: "デフォルトブラウザで URL を開きます。ユーザーが特定の Web ページやドキュメントを開きたいときに使ってください。",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [
@@ -39,19 +39,14 @@ struct OpenURLTool: NemoTool {
             return "無効な URL です。https:// で始まる URL を指定してください。"
         }
 
-        // UIApplication.shared.open は @MainActor が必要
-        let opened = await MainActor.run {
-            UIApplication.shared.canOpenURL(url)
-        }
-        guard opened else {
+        // NSWorkspace.shared.open は @MainActor 不要・macOS ネイティブ
+        let opened = NSWorkspace.shared.open(url)
+        if opened {
+            AppLogger.tool.info("🌐 open_url: 開いた URL=\(urlString)")
+            return "\(urlString) をブラウザで開きました。"
+        } else {
             AppLogger.tool.warning("⚠️ open_url: 開けない URL: \(urlString)")
             return "URL を開けませんでした: \(urlString)"
         }
-
-        await MainActor.run {
-            UIApplication.shared.open(url)
-        }
-        AppLogger.tool.info("🌐 open_url: 開いた URL=\(urlString)")
-        return "\(urlString) を Safari で開きました。"
     }
 }
