@@ -40,7 +40,9 @@ final class ToolService {
 
     /// 利用可能な tool の一覧
     var availableTools: [ToolDefinition] {
-        [currentTimeTool, weatherTool]
+        let tools = [currentTimeTool, weatherTool]
+        AppLogger.tool.info("🔧 availableTools: \(tools.count)件 [\(tools.map { $0.function.name }.joined(separator: ", "))]")
+        return tools
     }
 
     // MARK: - Tool 定義
@@ -83,6 +85,7 @@ final class ToolService {
     // MARK: - Tool 実行
 
     func execute(toolCallId: String, name: String, arguments: String) async -> ToolResult {
+        AppLogger.tool.info("▶️ execute: name=\(name) id=\(toolCallId) args=\(arguments)")
         let content: String
         switch name {
         case "get_current_time":
@@ -91,7 +94,9 @@ final class ToolService {
             content = executeGetWeather(arguments: arguments)
         default:
             content = "未知のツール: \(name)"
+            AppLogger.tool.warning("⚠️ 未知の tool: \(name)")
         }
+        AppLogger.tool.info("✅ execute 完了: name=\(name) result=\(content)")
         return ToolResult(toolCallId: toolCallId, name: name, content: content)
     }
 
@@ -102,18 +107,21 @@ final class ToolService {
         formatter.locale = Locale(identifier: "ja_JP")
         formatter.dateFormat = "yyyy年MM月dd日 HH:mm:ss (EEEE)"
         formatter.timeZone = TimeZone.current
-        return formatter.string(from: Date())
+        let result = formatter.string(from: Date())
+        AppLogger.tool.info("🕒 get_current_time: \(result)")
+        return result
     }
 
     private func executeGetWeather(arguments: String) -> String {
-        // スタブ実装: 実際の API 呼び出しに差し替え可能
         guard
             let data = arguments.data(using: .utf8),
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let location = json["location"] as? String
         else {
+            AppLogger.tool.error("❌ get_weather: 引数解析失敗 args=\(arguments)")
             return "引数の解析に失敗しました"
         }
+        AppLogger.tool.info("☁️ get_weather: location=\(location)")
         // TODO: 実際の天気 API に差し替える
         return "\(location) の天気: 晴れ、気温 20°C（スタブデータ）"
     }

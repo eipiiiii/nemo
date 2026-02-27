@@ -32,6 +32,7 @@ final class ChatViewModel: ObservableObject {
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
         self.modelContext = modelContext
+        AppLogger.chat.info("💬 ChatViewModel init: conversationId=\(conversationId)")
         loadMessages()
     }
 
@@ -42,18 +43,25 @@ final class ChatViewModel: ObservableObject {
             sortBy: [SortDescriptor(\.timestamp)]
         )
         messages = (try? modelContext.fetch(descriptor)) ?? []
+        AppLogger.chat.debug("💬 loadMessages: \(self.messages.count)件")
     }
 
     func sendMessage() {
         let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isLoading, !isStreaming else { return }
+        guard !trimmed.isEmpty, !isLoading, !isStreaming else {
+            AppLogger.chat.warning("⚠️ sendMessage スキップ: empty=\(trimmed.isEmpty) loading=\(self.isLoading) streaming=\(self.isStreaming)")
+            return
+        }
 
         guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
+            AppLogger.chat.error("❌ sendMessage: APIキーなし")
             errorMessage = "APIキーが設定されていません。設定画面から入力してください。"
             return
         }
 
-        // ユーザーメッセージを保存
+        let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
+        AppLogger.chat.info("🚀 sendMessage 開始: model=\(modelId) text='\(trimmed.prefix(50))'")
+
         let userMessage = Conversation(
             id: UUID(),
             role: "user",
@@ -66,9 +74,6 @@ final class ChatViewModel: ObservableObject {
         loadMessages()
         messageText = ""
 
-        let modelId = UserDefaults.standard.string(forKey: "selected_model_id") ?? "meta-llama/llama-3.3-70b-instruct:free"
-
-        // 会話履歴を [[String: Any]] 形式で構築
         let historyMessages: [[String: Any]] = messages.map { ["role": $0.role, "content": $0.content] }
 
         isStreaming = true
@@ -81,8 +86,8 @@ final class ChatViewModel: ObservableObject {
                 streamingContent = ""
                 toolCallStatus = nil
                 streamingTask = nil
+                AppLogger.chat.info("🏁 sendMessage Task 終了")
             }
-
             do {
                 try await runAgentLoop(
                     initialMessages: historyMessages,
@@ -90,6 +95,7 @@ final class ChatViewModel: ObservableObject {
                     apiKey: apiKey
                 )
             } catch {
+                AppLogger.chat.error("❌ sendMessage エラー: \(error)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -97,20 +103,24 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Agent Loop
 
-    /// tool call ループ → 最終ストリーミング回答
     private func runAgentLoop(
         initialMessages: [[String: Any]],
         modelId: String,
         apiKey: String
     ) async throws {
-        // system prompt を先頭に追加
         var messages = buildMessagesWithSystemPrompt(initialMessages)
         let tools = toolService.availableTools
 
-        for round in 0 ..< maxToolRounds {
-            guard !Task.isCancelled else { return }
+        AppLogger.chat.info("🤖 runAgentLoop 開始: maxRounds=\(self.maxToolRounds) tools=\(tools.count)件")
 
-            // 非ストリーミングで1ターン送信
+        for round in 0 ..< maxToolRounds {
+            guard !Task.isCancelled else {
+                AppLogger.chat.info("⏹️ runAgentLoop キャンセル: round=\(round)")
+                return
+            }
+
+            AppLogger.chat.info("🔄 ラウンド \(round + 1)/\(self.maxToolRounds) 開始: messages=\(messages.count)件")
+
             let choice = try await openRouterService.sendMessageWithTools(
                 messages: messages,
                 modelId: modelId,
@@ -118,9 +128,11 @@ final class ChatViewModel: ObservableObject {
                 apiKey: apiKey
             )
 
-            // tool_calls があれば実行してループ継続
+            AppLogger.chat.info("📨 ラウンド \(round + 1) 応答: finish_reason=\(choice.finish_reason ?? "nil") tool_calls=\(choice.message.tool_calls?.count ?? 0)件")
+
             if let toolCalls = choice.message.tool_calls, !toolCalls.isEmpty {
-                // assistant の tool_calls メッセージをコンテキストに追加
+                AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.function.name }.joined(separator: ", "))")
+
                 var assistantMsg: [String: Any] = ["role": "assistant"]
                 if let content = choice.message.content { assistantMsg["content"] = content }
                 let toolCallsJSON = toolCalls.map { tc -> [String: Any] in
@@ -136,28 +148,27 @@ final class ChatViewModel: ObservableObject {
                 assistantMsg["tool_calls"] = toolCallsJSON
                 messages.append(assistantMsg)
 
-                // 各 tool を実行して結果をコンテキストに追加
                 for toolCall in toolCalls {
                     toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
+                    AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
                     let result = await toolService.execute(
                         toolCallId: toolCall.id,
                         name: toolCall.function.name,
                         arguments: toolCall.function.arguments
                     )
+                    AppLogger.tool.info("✅ tool 結果: \(result.content)")
                     messages.append([
                         "role": "tool",
                         "tool_call_id": result.toolCallId,
                         "content": result.content,
                     ])
                 }
-                // 次ラウンドへ
                 continue
             }
 
-            // tool_calls がない = 最終回答
-            // ここまでのコンテキストでストリーミング回答
+            // 最終回答: ストリーミング
+            AppLogger.chat.info("🌊 ラウンド \(round + 1): toolなし → ストリーミング開始")
             toolCallStatus = nil
-            _ = round // suppress unused warning
 
             for try await chunk in openRouterService.sendMessageStream(
                 messages: messages,
@@ -168,7 +179,12 @@ final class ChatViewModel: ObservableObject {
                 streamingContent += chunk
             }
 
-            guard !Task.isCancelled, !streamingContent.isEmpty else { return }
+            guard !Task.isCancelled, !streamingContent.isEmpty else {
+                AppLogger.chat.warning("⚠️ ストリーミング: キャンセル or 空")
+                return
+            }
+
+            AppLogger.chat.info("✅ ストリーミング完了: \(self.streamingContent.count)文字")
 
             let assistantMessage = Conversation(
                 id: UUID(),
@@ -183,7 +199,8 @@ final class ChatViewModel: ObservableObject {
             return
         }
 
-        // maxToolRounds に達した場合はそのまま最終ストリーミング
+        // maxToolRounds 到達時
+        AppLogger.chat.warning("⚠️ maxToolRounds(\(self.maxToolRounds)) 到達 → ストリーミングで強制終了")
         toolCallStatus = nil
         for try await chunk in openRouterService.sendMessageStream(
             messages: messages,
@@ -232,10 +249,12 @@ final class ChatViewModel: ObservableObject {
         }
         var all: [[String: Any]] = [["role": "system", "content": systemContent]]
         all.append(contentsOf: messages)
+        AppLogger.chat.debug("📋 buildMessages: システムプロンプト追加後 \(all.count)件")
         return all
     }
 
     func cancelStreaming() {
+        AppLogger.chat.info("⏹️ cancelStreaming")
         streamingTask?.cancel()
         streamingTask = nil
 
@@ -250,6 +269,7 @@ final class ChatViewModel: ObservableObject {
             modelContext.insert(assistantMessage)
             try? modelContext.save()
             loadMessages()
+            AppLogger.chat.info("⏹️ 中断メッセージ保存: \(self.streamingContent.count)文字")
         }
 
         isStreaming = false
