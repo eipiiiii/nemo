@@ -10,12 +10,6 @@ class SettingsViewModel: ObservableObject {
     @Published var selectedModelId = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
-
-    // Google CSE
-    @Published var googleCseApiKey = ""
-    @Published var googleCseCx = ""
-
-    // SearXNG
     @Published var searxngUrl = "http://localhost:8080"
 
     private let service = OpenRouterService()
@@ -23,8 +17,6 @@ class SettingsViewModel: ObservableObject {
     private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
     private let selectedModelKey = "selected_model_id"
-    private let googleCseApiKeyKeychainKey = "google_cse_api_key"
-    private let googleCseCxKeychainKey = "google_cse_cx"
     private let searxngUrlKey = "searxng_url"
 
     init() {
@@ -49,28 +41,6 @@ class SettingsViewModel: ObservableObject {
         UserDefaults.standard.set(customPrompt, forKey: customPromptKey)
     }
 
-    func saveGoogleCseApiKey() {
-        let trimmed = googleCseApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        googleCseApiKey = trimmed
-        do {
-            try keychain.save(trimmed, forKey: googleCseApiKeyKeychainKey)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func saveGoogleCseCx() {
-        let trimmed = googleCseCx.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        googleCseCx = trimmed
-        do {
-            try keychain.save(trimmed, forKey: googleCseCxKeychainKey)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func saveSearxngUrl() {
         let trimmed = searxngUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -83,8 +53,6 @@ class SettingsViewModel: ObservableObject {
         apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
-        googleCseApiKey = keychain.load(forKey: googleCseApiKeyKeychainKey) ?? ""
-        googleCseCx = keychain.load(forKey: googleCseCxKeychainKey) ?? ""
         searxngUrl = UserDefaults.standard.string(forKey: searxngUrlKey) ?? "http://localhost:8080"
         AppLogger.settings.info("⚙️ loadSettings 完了")
     }

@@ -63,8 +63,7 @@ struct SettingsView: View {
 
                     // OpenRouter API
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("OpenRouter API")
-                            .font(.headline)
+                        Text("OpenRouter API").font(.headline)
                         VStack(alignment: .leading, spacing: 8) {
                             Text("APIキー").font(.subheadline).foregroundColor(.secondary)
                             SecureField("APIキーを入力", text: $viewModel.apiKey)
@@ -80,7 +79,7 @@ struct SettingsView: View {
 
                     Divider()
 
-                    // SearXNG 設定
+                    // SearXNG
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass.circle")
@@ -88,7 +87,7 @@ struct SettingsView: View {
                             Text("SearXNG (検索サーバー)")
                                 .font(.headline)
                         }
-                        Text("Docker で起動した SearXNG サーバーの URL を設定します。web_search ツールの第1優先で使用されます。")
+                        Text("Docker で起動した SearXNG サーバーの URL。web_search ツールで使用されます。")
                             .font(.caption).foregroundColor(.secondary)
 
                         VStack(alignment: .leading, spacing: 8) {
@@ -97,52 +96,6 @@ struct SettingsView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit { viewModel.saveSearxngUrl() }
                                 .onChange(of: viewModel.searxngUrl) { _, _ in viewModel.saveSearxngUrl() }
-                        }
-
-                        HStack(spacing: 6) {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(.secondary)
-                            Text("Docker 起動コマンドはチャットで「SearXNG の起動方法」と聴いてください")
-                                .font(.caption).foregroundColor(.secondary)
-                        }
-                    }
-
-                    Divider()
-
-                    // Google CSE（フォールバック）
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.secondary)
-                            Text("Google 検索 (CSE) ・フォールバック")
-                                .font(.headline)
-                        }
-                        Text("SearXNG が利用不可な場合のフォールバックとして使用されます。")
-                            .font(.caption).foregroundColor(.secondary)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("API キー").font(.subheadline).foregroundColor(.secondary)
-                            SecureField("Google CSE API キーを入力", text: $viewModel.googleCseApiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit { viewModel.saveGoogleCseApiKey() }
-                                .onChange(of: viewModel.googleCseApiKey) { _, _ in viewModel.saveGoogleCseApiKey() }
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("検索エンジン ID (cx)").font(.subheadline).foregroundColor(.secondary)
-                            TextField("例: 012345678901234567890", text: $viewModel.googleCseCx)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit { viewModel.saveGoogleCseCx() }
-                                .onChange(of: viewModel.googleCseCx) { _, _ in viewModel.saveGoogleCseCx() }
-                        }
-
-                        HStack(spacing: 6) {
-                            if !viewModel.googleCseApiKey.isEmpty && !viewModel.googleCseCx.isEmpty {
-                                Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                                Text("フォールバック有効").font(.caption).foregroundColor(.green)
-                            } else {
-                                Image(systemName: "minus.circle").foregroundColor(.secondary)
-                                Text("未設定（オプション）").font(.caption).foregroundColor(.secondary)
-                            }
                         }
                     }
 
@@ -197,7 +150,7 @@ struct SettingsView: View {
                 .padding()
             }
         }
-        .frame(minWidth: 500, maxWidth: 600, minHeight: 400, maxHeight: 800)
+        .frame(minWidth: 500, maxWidth: 600, minHeight: 400, maxHeight: 700)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
