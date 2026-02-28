@@ -15,6 +15,9 @@ class SettingsViewModel: ObservableObject {
     @Published var googleCseApiKey = ""
     @Published var googleCseCx = ""
 
+    // SearXNG
+    @Published var searxngUrl = "http://localhost:8080"
+
     private let service = OpenRouterService()
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
@@ -22,6 +25,7 @@ class SettingsViewModel: ObservableObject {
     private let selectedModelKey = "selected_model_id"
     private let googleCseApiKeyKeychainKey = "google_cse_api_key"
     private let googleCseCxKeychainKey = "google_cse_cx"
+    private let searxngUrlKey = "searxng_url"
 
     init() {
         AppLogger.settings.info("⚙️ SettingsViewModel init")
@@ -30,10 +34,7 @@ class SettingsViewModel: ObservableObject {
 
     func saveApiKey() {
         let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            AppLogger.settings.warning("⚠️ saveApiKey スキップ: 空文字")
-            return
-        }
+        guard !trimmed.isEmpty else { return }
         apiKey = trimmed
         do {
             try keychain.save(trimmed, forKey: apiKeyKeychainKey)
@@ -46,7 +47,6 @@ class SettingsViewModel: ObservableObject {
 
     func saveCustomPrompt() {
         UserDefaults.standard.set(customPrompt, forKey: customPromptKey)
-        AppLogger.settings.info("✅ saveCustomPrompt: \(self.customPrompt.count)文字")
     }
 
     func saveGoogleCseApiKey() {
@@ -55,9 +55,7 @@ class SettingsViewModel: ObservableObject {
         googleCseApiKey = trimmed
         do {
             try keychain.save(trimmed, forKey: googleCseApiKeyKeychainKey)
-            AppLogger.settings.info("✅ saveGoogleCseApiKey: 保存完了")
         } catch {
-            AppLogger.settings.error("❌ saveGoogleCseApiKey エラー: \(error)")
             errorMessage = error.localizedDescription
         }
     }
@@ -68,11 +66,17 @@ class SettingsViewModel: ObservableObject {
         googleCseCx = trimmed
         do {
             try keychain.save(trimmed, forKey: googleCseCxKeychainKey)
-            AppLogger.settings.info("✅ saveGoogleCseCx: 保存完了")
         } catch {
-            AppLogger.settings.error("❌ saveGoogleCseCx エラー: \(error)")
             errorMessage = error.localizedDescription
         }
+    }
+
+    func saveSearxngUrl() {
+        let trimmed = searxngUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        searxngUrl = trimmed
+        UserDefaults.standard.set(trimmed, forKey: searxngUrlKey)
+        AppLogger.settings.info("✅ saveSearxngUrl: \(trimmed)")
     }
 
     func loadSettings() {
@@ -81,32 +85,27 @@ class SettingsViewModel: ObservableObject {
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
         googleCseApiKey = keychain.load(forKey: googleCseApiKeyKeychainKey) ?? ""
         googleCseCx = keychain.load(forKey: googleCseCxKeychainKey) ?? ""
-        AppLogger.settings.info("⚙️ loadSettings: apiKey文字数=\(self.apiKey.count) model=\(self.selectedModelId) cse=\(self.googleCseApiKey.isEmpty ? "未設定" : "設定済み")")
+        searxngUrl = UserDefaults.standard.string(forKey: searxngUrlKey) ?? "http://localhost:8080"
+        AppLogger.settings.info("⚙️ loadSettings 完了")
     }
 
     func selectModel(_ model: Model) {
         selectedModelId = model.id
         UserDefaults.standard.set(selectedModelId, forKey: selectedModelKey)
-        AppLogger.settings.info("✅ selectModel: \(model.id)")
     }
 
     func fetchModels() {
         guard !apiKey.isEmpty else {
-            AppLogger.settings.warning("⚠️ fetchModels スキップ: APIキーなし")
             errorMessage = "APIキーを入力してください"
             return
         }
-        AppLogger.settings.info("📊 fetchModels 開始")
         isLoading = true
         errorMessage = nil
-
         Task {
             do {
                 let models = try await service.getModels(apiKey: apiKey)
                 self.models = models
-                AppLogger.settings.info("✅ fetchModels 完了: \(models.count)件")
             } catch {
-                AppLogger.settings.error("❌ fetchModels エラー: \(error)")
                 self.errorMessage = error.localizedDescription
             }
             self.isLoading = false
