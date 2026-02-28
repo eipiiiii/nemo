@@ -1,12 +1,5 @@
-//
-//  SettingsViewModel.swift
-//  nemo
-//
-//  Created by 林栄介 on 2026/01/31.
-//
-
-import Foundation
 import Combine
+import Foundation
 import os
 
 @MainActor
@@ -18,11 +11,17 @@ class SettingsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    // Google CSE
+    @Published var googleCseApiKey = ""
+    @Published var googleCseCx = ""
+
     private let service = OpenRouterService()
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
     private let selectedModelKey = "selected_model_id"
+    private let googleCseApiKeyKeychainKey = "google_cse_api_key"
+    private let googleCseCxKeychainKey = "google_cse_cx"
 
     init() {
         AppLogger.settings.info("⚙️ SettingsViewModel init")
@@ -50,11 +49,39 @@ class SettingsViewModel: ObservableObject {
         AppLogger.settings.info("✅ saveCustomPrompt: \(self.customPrompt.count)文字")
     }
 
+    func saveGoogleCseApiKey() {
+        let trimmed = googleCseApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        googleCseApiKey = trimmed
+        do {
+            try keychain.save(trimmed, forKey: googleCseApiKeyKeychainKey)
+            AppLogger.settings.info("✅ saveGoogleCseApiKey: 保存完了")
+        } catch {
+            AppLogger.settings.error("❌ saveGoogleCseApiKey エラー: \(error)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func saveGoogleCseCx() {
+        let trimmed = googleCseCx.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        googleCseCx = trimmed
+        do {
+            try keychain.save(trimmed, forKey: googleCseCxKeychainKey)
+            AppLogger.settings.info("✅ saveGoogleCseCx: 保存完了")
+        } catch {
+            AppLogger.settings.error("❌ saveGoogleCseCx エラー: \(error)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func loadSettings() {
         apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
-        AppLogger.settings.info("⚙️ loadSettings: apiKey文字数=\(self.apiKey.count) model=\(self.selectedModelId)")
+        googleCseApiKey = keychain.load(forKey: googleCseApiKeyKeychainKey) ?? ""
+        googleCseCx = keychain.load(forKey: googleCseCxKeychainKey) ?? ""
+        AppLogger.settings.info("⚙️ loadSettings: apiKey文字数=\(self.apiKey.count) model=\(self.selectedModelId) cse=\(self.googleCseApiKey.isEmpty ? "未設定" : "設定済み")")
     }
 
     func selectModel(_ model: Model) {

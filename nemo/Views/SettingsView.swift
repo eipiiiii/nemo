@@ -11,7 +11,7 @@ struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @State private var showingModelSelection = false
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // ヘッダー
@@ -27,22 +27,23 @@ struct SettingsView: View {
             }
             .padding()
             .background(Color(nsColor: .windowBackgroundColor))
-            
+
             Divider()
-            
+
             // コンテンツ
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+
                     // カスタムプロンプト設定
                     VStack(alignment: .leading, spacing: 12) {
                         Text("カスタム指示")
                             .font(.headline)
-                        
+
                         VStack(alignment: .leading, spacing: 8) {
                             Text("AIの振る舞いや制約を追加できます（オプション）")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             TextEditor(text: $viewModel.customPrompt)
                                 .font(.system(.body, design: .default))
                                 .frame(height: 100)
@@ -56,7 +57,7 @@ struct SettingsView: View {
                                 .onChange(of: viewModel.customPrompt) { _, _ in
                                     viewModel.saveCustomPrompt()
                                 }
-                            
+
                             HStack {
                                 Text("例: 「回答は日本語で、簡潔にまとめてください」")
                                     .font(.caption)
@@ -72,14 +73,14 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    
+
                     Divider()
-                    
-                    // API設定
+
+                    // OpenRouter API 設定
                     VStack(alignment: .leading, spacing: 12) {
                         Text("OpenRouter API")
                             .font(.headline)
-                        
+
                         VStack(alignment: .leading, spacing: 8) {
                             Text("APIキー")
                                 .font(.subheadline)
@@ -89,7 +90,7 @@ struct SettingsView: View {
                                 .onSubmit {
                                     viewModel.saveApiKey()
                                 }
-                            
+
                             Button("モデル一覧を取得") {
                                 viewModel.saveApiKey()
                                 viewModel.fetchModels()
@@ -97,15 +98,75 @@ struct SettingsView: View {
                             .disabled(viewModel.isLoading || viewModel.apiKey.isEmpty)
                         }
                     }
-                    
+
                     Divider()
-                    
+
+                    // Google CSE 設定
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            Text("Google 検索 (CSE)")
+                                .font(.headline)
+                        }
+
+                        Text("web_search ツールで使用されます。未設定の場合、検索機能は無効になります。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("API キー")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            SecureField("Google CSE API キーを入力", text: $viewModel.googleCseApiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { viewModel.saveGoogleCseApiKey() }
+                                .onChange(of: viewModel.googleCseApiKey) { _, _ in
+                                    viewModel.saveGoogleCseApiKey()
+                                }
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("検索エンジン ID (cx)")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            TextField("例: 012345678901234567890", text: $viewModel.googleCseCx)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { viewModel.saveGoogleCseCx() }
+                                .onChange(of: viewModel.googleCseCx) { _, _ in
+                                    viewModel.saveGoogleCseCx()
+                                }
+                        }
+
+                        // 設定状態インジケーター
+                        HStack(spacing: 6) {
+                            if !viewModel.googleCseApiKey.isEmpty && !viewModel.googleCseCx.isEmpty {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("検索機能有効")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Image(systemName: "exclamationmark.circle")
+                                    .foregroundColor(.orange)
+                                Text("未設定 — 両方入力すると有効になります")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            Spacer()
+                            Link("取得方法",
+                                 destination: URL(string: "https://developers.google.com/custom-search/v1/overview")!)
+                                .font(.caption)
+                        }
+                    }
+
+                    Divider()
 
                     // モデル選択
                     VStack(alignment: .leading, spacing: 12) {
                         Text("選択中のモデル")
                             .font(.headline)
-                        
+
                         if !viewModel.selectedModelId.isEmpty {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -134,7 +195,7 @@ struct SettingsView: View {
                             .disabled(viewModel.models.isEmpty)
                         }
                     }
-                    
+
                     // ローディング表示
                     if viewModel.isLoading {
                         Divider()
@@ -146,7 +207,7 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     // エラー表示
                     if let errorMessage = viewModel.errorMessage {
                         Divider()
@@ -169,7 +230,7 @@ struct SettingsView: View {
                 .padding()
             }
         }
-        .frame(minWidth: 500, maxWidth: 600, minHeight: 400, maxHeight: 700)
+        .frame(minWidth: 500, maxWidth: 600, minHeight: 400, maxHeight: 750)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionView(viewModel: viewModel)
         }
@@ -180,18 +241,18 @@ struct ModelSelectionView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var searchText = ""
     @Environment(\.dismiss) private var dismiss
-    
+
     var filteredModels: [Model] {
         if searchText.isEmpty {
             return viewModel.models
         } else {
             return viewModel.models.filter { model in
                 model.name.localizedCaseInsensitiveContains(searchText) ||
-                model.id.localizedCaseInsensitiveContains(searchText)
+                    model.id.localizedCaseInsensitiveContains(searchText)
             }
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // ヘッダー
@@ -206,9 +267,9 @@ struct ModelSelectionView: View {
                 .keyboardShortcut(.defaultAction)
             }
             .padding()
-            
+
             Divider()
-            
+
             // 検索バー
             HStack {
                 Image(systemName: "magnifyingglass")
@@ -227,9 +288,9 @@ struct ModelSelectionView: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(8)
             .padding()
-            
+
             Divider()
-            
+
             // モデルリスト
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -243,14 +304,14 @@ struct ModelSelectionView: View {
                                     Text(model.name)
                                         .font(.headline)
                                         .foregroundColor(.primary)
-                                    
+
                                     if let description = model.description {
                                         Text(description)
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                             .lineLimit(2)
                                     }
-                                    
+
                                     HStack(spacing: 12) {
                                         if let contextLength = model.contextLength {
                                             Label("\(contextLength)", systemImage: "text.alignleft")
@@ -271,9 +332,9 @@ struct ModelSelectionView: View {
                                         }
                                     }
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 if viewModel.selectedModelId == model.id {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.blue)
@@ -286,7 +347,7 @@ struct ModelSelectionView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        
+
                         Divider()
                     }
                 }
