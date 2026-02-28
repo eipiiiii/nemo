@@ -2,13 +2,15 @@ import Foundation
 import os
 
 /// 全 tool を登録・ dispatch するレジストリ。
-/// 新しい tool を追加するときは `nemoApp.swift` で登録するだけでよい。
+/// 新しい tool を追加するときはこのリストに1行追加するだけでよい。
 final class ToolRegistry: @unchecked Sendable {
     static let shared: ToolRegistry = {
         ToolRegistry(tools: [
             GetCurrentTimeTool(),
             GetWeatherTool(),
             OpenURLTool(),
+            FetchPageTool(),
+            WebSearchTool(),
         ])
     }()
 
