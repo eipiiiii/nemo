@@ -258,7 +258,20 @@ final class ChatViewModel: ObservableObject {
                 AppLogger.chat.info("⏹️ 終了: まとめ回答へ")
                 messages.append([
                     "role": "user",
-                    "content": "You have reached the maximum number of tool calls. Do NOT call any more tools or output tool_call tags. Summarize everything you have gathered so far and provide your final answer now.",
+                    "content": """
+                    FINAL ANSWER REQUIRED.
+
+                    You have used all available tool calls. Now write your complete response as plain text only.
+
+                    STRICT RULES - violating any of these is an error:
+                    - Do NOT write <tool_call> tags
+                    - Do NOT write JSON function calls
+                    - Do NOT write any code blocks that represent tool invocations
+                    - Do NOT say you need more information
+                    - Do NOT ask to search again
+
+                    Using ONLY the information already collected above, write your final answer now in natural language using Markdown.
+                    """,
                 ])
                 let _ = try await openRouterService.sendRound(
                     messages: messages,
@@ -270,7 +283,7 @@ final class ChatViewModel: ObservableObject {
                     await MainActor.run { self.streamingContent += chunk }
                 }
                 guard !Task.isCancelled, !streamingContent.isEmpty else { return }
-                AppLogger.chat.info("🤖 まとめ回答:\n\(self.streamingContent)")
+                AppLogger.chat.info("🤖 まとめ回答:\n\(self.streamingContent.prefix(200))")
                 let assistantMessage = Conversation(
                     id: UUID(), role: "assistant", content: streamingContent,
                     timestamp: Date(), conversationId: conversationId
