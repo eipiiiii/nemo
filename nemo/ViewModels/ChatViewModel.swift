@@ -132,7 +132,14 @@ final class ChatViewModel: ObservableObject {
                 apiKey: apiKey
             )
 
-            AppLogger.chat.info("📨 ラウンド \(round + 1) 応答: finish_reason=\(choice.finish_reason ?? "nil") tool_calls=\(choice.message.tool_calls?.count ?? 0)件")
+            let finishReason = choice.finish_reason ?? "nil"
+            let toolCallCount = choice.message.tool_calls?.count ?? 0
+            AppLogger.chat.info("📨 ラウンド \(round + 1) 応答: finish_reason=\(finishReason) tool_calls=\(toolCallCount)件")
+
+            // モデルのテキスト返答（thinking やツール呼び出し前のコメント）をログ出力
+            if let assistantText = choice.message.content, !assistantText.isEmpty {
+                AppLogger.chat.info("🤖 モデル応答 (content): \(assistantText)")
+            }
 
             if let toolCalls = choice.message.tool_calls, !toolCalls.isEmpty {
                 AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.function.name }.joined(separator: ", "))")
@@ -154,6 +161,8 @@ final class ChatViewModel: ObservableObject {
                 messages.append(assistantMsg)
 
                 for toolCall in toolCalls {
+                    // tool call の名前と引数をログ出力
+                    AppLogger.chat.info("🔧 tool call: \(toolCall.function.name) args=\(toolCall.function.arguments)")
                     toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
                     AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
 
@@ -206,7 +215,9 @@ final class ChatViewModel: ObservableObject {
                 return
             }
 
+            // 最終回答の全文をログ出力
             AppLogger.chat.info("✅ ストリーミング完了: \(self.streamingContent.count)文字")
+            AppLogger.chat.info("🤖 モデル最終回答:\n\(self.streamingContent)")
 
             let assistantMessage = Conversation(
                 id: UUID(),
@@ -233,6 +244,10 @@ final class ChatViewModel: ObservableObject {
             streamingContent += chunk
         }
         guard !Task.isCancelled, !streamingContent.isEmpty else { return }
+
+        // maxRounds 到達時の強制回答もログ出力
+        AppLogger.chat.info("🤖 モデル最終回答 (maxRounds強制):\n\(self.streamingContent)")
+
         let assistantMessage = Conversation(
             id: UUID(),
             role: "assistant",
