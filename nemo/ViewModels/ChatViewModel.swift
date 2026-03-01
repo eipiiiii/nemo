@@ -115,14 +115,12 @@ final class ChatViewModel: ObservableObject {
             }
             AppLogger.chat.info("🔄 ラウンド \(round + 1)/\(self.maxToolRounds) 開始: messages=\(messages.count)件")
 
-            // 1回のストリーミングで tool 判定 + テキスト表示を同時に実施
             let result = try await openRouterService.sendRound(
                 messages: messages,
                 modelId: modelId,
                 tools: tools,
                 apiKey: apiKey
             ) { [weak self] chunk in
-                // tool なしの最終回答時はその場でUIに流す
                 guard let self else { return }
                 await MainActor.run { self.streamingContent += chunk }
             }
@@ -131,7 +129,22 @@ final class ChatViewModel: ObservableObject {
             case .toolCalls(let toolCalls, let assistantContent):
                 AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.name }.joined(separator: ", "))")
 
-                // assistant メッセージをコンテキストに追加
+                // ① 中間テキストがあれば tool_use より先に DB 保存
+                //    → timestamp 順で assistant が tool_use の上に来る
+                if let content = assistantContent, !content.isEmpty {
+                    let intermediateMsg = Conversation(
+                        id: UUID(), role: "assistant", content: content,
+                        timestamp: Date(), conversationId: conversationId
+                    )
+                    modelContext.insert(intermediateMsg)
+                    try? modelContext.save()
+                    loadMessages()
+                    // UI のストリーミング表示はリセット（DB に永続化済み）
+                    streamingContent = ""
+                    AppLogger.chat.info("💾 中間 assistant メッセージ保存: \(content.count)文字")
+                }
+
+                // ② assistant メッセージをAPIコンテキストに追加
                 var assistantMsg: [String: Any] = ["role": "assistant"]
                 if let content = assistantContent { assistantMsg["content"] = content }
                 assistantMsg["tool_calls"] = toolCalls.map { tc -> [String: Any] in
@@ -143,6 +156,7 @@ final class ChatViewModel: ObservableObject {
                 }
                 messages.append(assistantMsg)
 
+                // ③ tool を順番に実行・保存（timestamp が必ず assistant より後）
                 for toolCall in toolCalls {
                     AppLogger.chat.info("🔧 tool call: \(toolCall.name) args=\(toolCall.arguments)")
                     await MainActor.run { toolCallStatus = "🔧 \(toolCall.name) 実行中..." }
@@ -173,7 +187,6 @@ final class ChatViewModel: ObservableObject {
                 await MainActor.run { toolCallStatus = nil }
 
             case .finished:
-                // onChunk で既に streamingContent に流し尾わり
                 AppLogger.chat.info("✅ ラウンド \(round + 1): 最終回答完了 \(self.streamingContent.count)文字")
                 AppLogger.chat.info("🤖 モデル最終回答:\n\(self.streamingContent)")
 
@@ -198,7 +211,7 @@ final class ChatViewModel: ObservableObject {
         let _ = try await openRouterService.sendRound(
             messages: messages,
             modelId: modelId,
-            tools: [],   // toolなしで強制終了
+            tools: [],
             apiKey: apiKey
         ) { [weak self] chunk in
             guard let self else { return }
