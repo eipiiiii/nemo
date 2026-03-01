@@ -245,21 +245,30 @@ final class ChatViewModel: ObservableObject {
         loadMessages()
     }
 
-    // MARK: - Private
+    // MARK: - System Prompt
 
     private func buildMessagesWithSystemPrompt(_ messages: [[String: Any]]) -> [[String: Any]] {
         let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
-        let availableToolNames = toolRegistry.availableTools.map { $0.name }.sorted().joined(separator: ", ")
 
-        // 現在時刻・タイムゾーンを動的に生成
-        let now = Date()
+        // 現在時刻・タイムゾーンを動的生成
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm (EEEE)"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        let tz = TimeZone.current
-        formatter.timeZone = tz
-        let currentTimeString = formatter.string(from: now)
-        let tzName = tz.identifier  // e.g. "Asia/Tokyo"
+        formatter.timeZone = TimeZone.current
+        let currentTimeString = formatter.string(from: Date())
+        let tzName = TimeZone.current.identifier
+
+        // ToolRegistry から tool ガイドラインを動的生成
+        // 各 tool の description をそのまま活用するため、
+        // description の品質改善 = プロンプト品質の改善 に直結する
+        let toolGuidelines = toolRegistry.availableTools
+            .sorted { $0.name < $1.name }
+            .map { "- `\($0.name)`: \($0.function.description)" }
+            .joined(separator: "\n")
+        let toolNameList = toolRegistry.availableTools
+            .map { $0.name }
+            .sorted()
+            .joined(separator: ", ")
 
         var systemContent = """
             You are nemo, a helpful AI assistant running on macOS.
@@ -275,16 +284,15 @@ final class ChatViewModel: ObservableObject {
             - For time-sensitive information (news, weather, prices, etc.), always use tools to get up-to-date data instead of relying on training knowledge.
 
             # Tools
-            You have access to the following tools: \(availableToolNames)
+            You have access to exactly these tools: \(toolNameList)
 
-            **IMPORTANT — Tool Usage Rules:**
-            - Only call tools that are listed above. Never invent or assume the existence of tools not listed.
-            - Use `web_search` when the user asks for current events, news, live data, or anything that may have changed after your training cutoff.
-            - Use `fetch_page` to retrieve the full content of a specific URL after finding it via `web_search`.
-            - Use `get_current_time` when the user asks for the current date or time.
-            - Use `get_weather` when the user asks for weather information.
-            - Use `open_url` to open a URL in the user's browser when explicitly asked to do so.
-            - When a tool returns an error, do not retry the same call repeatedly. Explain the issue to the user instead.
+            **Tool usage guidelines:**
+            \(toolGuidelines)
+
+            **Rules that must always be followed:**
+            - Only call tools listed above. Never call a tool that is not in the list above, even if you believe it exists.
+            - If a tool call returns an error, do not retry the same call. Explain the problem to the user instead.
+            - Do not call multiple tools in the same round unless they are fully independent.
 
             # Response Formatting
             Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:

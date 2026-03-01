@@ -7,13 +7,13 @@ struct FetchPageTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "fetch_page",
-                description: "指定した URL の Web ページのテキスト内容を取得します。ページの内容を要約・読み取りたいときに使ってください。",
+                description: "Fetches and returns the plain text content of a webpage at the given URL. Use this to read the full content of a specific page after finding its URL via web_search — for example, to summarize an article, extract details, or verify information. Only https:// URLs are accepted. The response is truncated to 4000 characters.",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [
                         "url": ToolProperty(
                             type: "string",
-                            description: "取得する URL（https:// で始まる必要があります）"
+                            description: "The URL of the page to fetch. Must start with https://"
                         )
                     ],
                     required: ["url"]
@@ -54,7 +54,9 @@ struct FetchPageTool: NemoTool {
                 ?? ""
 
             let text = stripHTML(raw)
-            let truncated = text.count > 4000 ? String(text.prefix(4000)) + "\n...ページの内容が長いため先頭4000文字で打ち切りました。" : text
+            let truncated = text.count > 4000
+                ? String(text.prefix(4000)) + "\n...ページの内容が長いため先頭4000文字で打ち切りました。"
+                : text
 
             AppLogger.tool.info("✅ fetch_page 完了: \(truncated.count)文字 url=\(urlString)")
             return truncated.isEmpty ? "ページのテキストを取得できませんでした。" : truncated
@@ -67,15 +69,10 @@ struct FetchPageTool: NemoTool {
     // MARK: - HTML タグ除去
 
     private func stripHTML(_ html: String) -> String {
-        // <script> / <style> ブロックごと削除
         var text = html
             .replacingOccurrences(of: #"<script[\s\S]*?</script>"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"<style[\s\S]*?</style>"#, with: " ", options: .regularExpression)
-
-        // HTML タグをスペースに置換
         text = text.replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
-
-        // HTML エンティティをデコード
         let entities: [(String, String)] = [
             ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
             ("&quot;", "\""), ("&#39;", "'"), ("&nbsp;", " "),
@@ -84,14 +81,11 @@ struct FetchPageTool: NemoTool {
         for (entity, char) in entities {
             text = text.replacingOccurrences(of: entity, with: char)
         }
-
-        // 連続空白を整理
         text = text
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
-
         return text
     }
 }

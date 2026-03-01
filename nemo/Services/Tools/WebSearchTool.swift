@@ -9,13 +9,13 @@ struct WebSearchTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "web_search",
-                description: "Web 検索を行い、関連するページのタイトル・ URL ・スニペットを返します。最新情報や不明なことを調べるときに使ってください。",
+                description: "Searches the web and returns titles, URLs, and snippets of relevant results. Use this for current events, recent news, live data (prices, scores, weather), or any information that may have changed after the model's training cutoff. Prefer concise English queries for best results. Returns up to 5 results.",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [
                         "query": ToolProperty(
                             type: "string",
-                            description: "検索クエリー"
+                            description: "Search query string. Use concise keywords rather than full sentences (e.g. 'Tokyo weather today' instead of 'What is the weather like in Tokyo today?')."
                         )
                     ],
                     required: ["query"]

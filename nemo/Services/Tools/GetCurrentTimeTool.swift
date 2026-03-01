@@ -7,7 +7,7 @@ struct GetCurrentTimeTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "get_current_time",
-                description: "現在の日時を返します。日時に関する質問に答えるときに使ってください。",
+                description: "Returns the current local date and time. Use this when the user asks what time or date it is, or when you need the precise current timestamp for a calculation. Do NOT use this just to confirm the date already provided in the system prompt.",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [:],

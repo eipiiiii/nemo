@@ -7,13 +7,13 @@ struct GetWeatherTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "get_weather",
-                description: "指定した都市の現在の天気を返します。",
+                description: "Returns the current weather for a specified city. Use this when the user asks about the weather or temperature in a location. Provide the city name in English (e.g. 'Tokyo', 'New York').",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [
                         "location": ToolProperty(
                             type: "string",
-                            description: "都市名（例: Tokyo, New York）"
+                            description: "City name in English (e.g. 'Tokyo', 'Osaka', 'New York')"
                         )
                     ],
                     required: ["location"]

@@ -8,13 +8,13 @@ struct OpenURLTool: NemoTool {
             type: "function",
             function: ToolFunction(
                 name: "open_url",
-                description: "デフォルトブラウザで URL を開きます。ユーザーが特定の Web ページやドキュメントを開きたいときに使ってください。",
+                description: "Opens a URL in the user's default browser. Use this only when the user explicitly asks to open or visit a specific webpage. Do NOT use this speculatively — only open a URL when the user has clearly requested it. Only https:// URLs are accepted.",
                 parameters: ToolParameter(
                     type: "object",
                     properties: [
                         "url": ToolProperty(
                             type: "string",
-                            description: "開く URL（https:// で始まる必要があります）"
+                            description: "The URL to open. Must start with https://"
                         )
                     ],
                     required: ["url"]
@@ -39,7 +39,6 @@ struct OpenURLTool: NemoTool {
             return "無効な URL です。https:// で始まる URL を指定してください。"
         }
 
-        // NSWorkspace.shared.open は @MainActor 不要・macOS ネイティブ
         let opened = NSWorkspace.shared.open(url)
         if opened {
             AppLogger.tool.info("🌐 open_url: 開いた URL=\(urlString)")
