@@ -129,7 +129,7 @@ final class OpenRouterService: Sendable {
     // MARK: - Streaming with tool_calls support
 
     /// 1ラウンドをストリーミングで実行。
-    /// - tool 呼び出しがあれば .toolCalls を返す（API呈调引用は1回）。
+    /// - tool 呼び出しがあれば .toolCalls を返す（API呼び出しは1回）。
     /// - 最終回答のテキストは onChunk コールバックでUIにその場で流す。
     nonisolated func sendRound(
         messages: [[String: Any]],
@@ -151,6 +151,9 @@ final class OpenRouterService: Sendable {
             let toolsJSON = try JSONSerialization.jsonObject(with: toolsData)
             body["tools"] = toolsJSON
             body["tool_choice"] = "auto"
+        } else {
+            // tools が空のラウンドではツール呼び出しを API レベルで完全禁止
+            body["tool_choice"] = "none"
         }
 
         let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body, apiKey: apiKey)
