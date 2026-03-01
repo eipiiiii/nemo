@@ -21,7 +21,7 @@ final class ChatViewModel: ObservableObject {
     private let conversationId: UUID
     private let modelContext: ModelContext
     private let openRouterService = OpenRouterService()
-    private let toolService = ToolService.shared
+    private let toolRegistry = ToolRegistry.shared
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
 
@@ -85,13 +85,6 @@ final class ChatViewModel: ObservableObject {
         toolCallStatus = nil
 
         streamingTask = Task {
-            defer {
-                isStreaming = false
-                streamingContent = ""
-                toolCallStatus = nil
-                streamingTask = nil
-                AppLogger.chat.info("🏁 sendMessage Task 終了")
-            }
             do {
                 try await runAgentLoop(
                     initialMessages: historyMessages,
@@ -100,7 +93,18 @@ final class ChatViewModel: ObservableObject {
                 )
             } catch {
                 AppLogger.chat.error("❌ sendMessage エラー: \(error)")
-                errorMessage = error.localizedDescription
+                // @MainActor クラス内だが非同期 Task の完了タイミングで
+                // SwiftUI のビュー更新サイクル外に出る場合があるため
+                // @Published 変更は必ず MainActor.run でラップする
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+            // defer を使わず、Task 完了後に明示的にリセット
+            await MainActor.run {
+                isStreaming = false
+                streamingContent = ""
+                toolCallStatus = nil
+                streamingTask = nil
+                AppLogger.chat.info("🏁 sendMessage Task 終了")
             }
         }
     }
@@ -113,7 +117,7 @@ final class ChatViewModel: ObservableObject {
         apiKey: String
     ) async throws {
         var messages = buildMessagesWithSystemPrompt(initialMessages)
-        let tools = toolService.availableTools
+        let tools = toolRegistry.availableTools
 
         AppLogger.chat.info("🤖 runAgentLoop 開始: maxRounds=\(self.maxToolRounds) tools=\(tools.count)件")
 
@@ -132,7 +136,14 @@ final class ChatViewModel: ObservableObject {
                 apiKey: apiKey
             )
 
-            AppLogger.chat.info("📨 ラウンド \(round + 1) 応答: finish_reason=\(choice.finish_reason ?? "nil") tool_calls=\(choice.message.tool_calls?.count ?? 0)件")
+            let finishReason = choice.finish_reason ?? "nil"
+            let toolCallCount = choice.message.tool_calls?.count ?? 0
+            AppLogger.chat.info("📨 ラウンド \(round + 1) 応答: finish_reason=\(finishReason) tool_calls=\(toolCallCount)件")
+
+            // モデルのテキスト返答（thinking やツール呼び出し前のコメント）をログ出力
+            if let assistantText = choice.message.content, !assistantText.isEmpty {
+                AppLogger.chat.info("🤖 モデル応答 (content): \(assistantText)")
+            }
 
             if let toolCalls = choice.message.tool_calls, !toolCalls.isEmpty {
                 AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.function.name }.joined(separator: ", "))")
@@ -154,10 +165,11 @@ final class ChatViewModel: ObservableObject {
                 messages.append(assistantMsg)
 
                 for toolCall in toolCalls {
-                    toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
+                    AppLogger.chat.info("🔧 tool call: \(toolCall.function.name) args=\(toolCall.function.arguments)")
+                    await MainActor.run { toolCallStatus = "🔧 \(toolCall.function.name) 実行中..." }
                     AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
 
-                    let result = await toolService.execute(
+                    let result = await toolRegistry.execute(
                         toolCallId: toolCall.id,
                         name: toolCall.function.name,
                         arguments: toolCall.function.arguments
@@ -178,7 +190,6 @@ final class ChatViewModel: ObservableObject {
                     try? modelContext.save()
                     loadMessages()
 
-                    // API コンテキストに tool 結果を追加
                     messages.append([
                         "role": "tool",
                         "tool_call_id": result.toolCallId,
@@ -190,7 +201,7 @@ final class ChatViewModel: ObservableObject {
 
             // 最終回答: ストリーミング
             AppLogger.chat.info("🌊 ラウンド \(round + 1): toolなし → ストリーミング開始")
-            toolCallStatus = nil
+            await MainActor.run { toolCallStatus = nil }
 
             for try await chunk in openRouterService.sendMessageStream(
                 messages: messages,
@@ -198,7 +209,7 @@ final class ChatViewModel: ObservableObject {
                 apiKey: apiKey
             ) {
                 guard !Task.isCancelled else { return }
-                streamingContent += chunk
+                await MainActor.run { streamingContent += chunk }
             }
 
             guard !Task.isCancelled, !streamingContent.isEmpty else {
@@ -207,6 +218,7 @@ final class ChatViewModel: ObservableObject {
             }
 
             AppLogger.chat.info("✅ ストリーミング完了: \(self.streamingContent.count)文字")
+            AppLogger.chat.info("🤖 モデル最終回答:\n\(self.streamingContent)")
 
             let assistantMessage = Conversation(
                 id: UUID(),
@@ -223,16 +235,19 @@ final class ChatViewModel: ObservableObject {
 
         // maxToolRounds 到達時
         AppLogger.chat.warning("⚠️ maxToolRounds(\(self.maxToolRounds)) 到達 → ストリーミングで強制終了")
-        toolCallStatus = nil
+        await MainActor.run { toolCallStatus = nil }
         for try await chunk in openRouterService.sendMessageStream(
             messages: messages,
             modelId: modelId,
             apiKey: apiKey
         ) {
             guard !Task.isCancelled else { return }
-            streamingContent += chunk
+            await MainActor.run { streamingContent += chunk }
         }
         guard !Task.isCancelled, !streamingContent.isEmpty else { return }
+
+        AppLogger.chat.info("🤖 モデル最終回答 (maxRounds強制):\n\(self.streamingContent)")
+
         let assistantMessage = Conversation(
             id: UUID(),
             role: "assistant",
@@ -245,30 +260,66 @@ final class ChatViewModel: ObservableObject {
         loadMessages()
     }
 
-    // MARK: - Private
+    // MARK: - System Prompt
 
     private func buildMessagesWithSystemPrompt(_ messages: [[String: Any]]) -> [[String: Any]] {
         let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm (EEEE)"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        let currentTimeString = formatter.string(from: Date())
+        let tzName = TimeZone.current.identifier
+
+        let toolGuidelines = toolRegistry.availableTools
+            .sorted { $0.name < $1.name }
+            .map { "- `\($0.name)`: \($0.function.description)" }
+            .joined(separator: "\n")
+        let toolNameList = toolRegistry.availableTools
+            .map { $0.name }
+            .sorted()
+            .joined(separator: ", ")
+
         var systemContent = """
-            You are a helpful AI assistant.
-            Provide accurate, concise, and well-structured responses.
+            You are nemo, a helpful AI assistant running on macOS.
 
-            # Formatting Guidelines
+            <environment>
+            Current time: \(currentTimeString)
+            Timezone: \(tzName)
+            </environment>
+
+            # Core Principles
+            - Be accurate, concise, and honest.
+            - If you are unsure about something, say so rather than guessing.
+            - For time-sensitive information (news, weather, prices, etc.), always use tools to get up-to-date data instead of relying on training knowledge.
+
+            # Tools
+            You have access to exactly these tools: \(toolNameList)
+
+            **Tool usage guidelines:**
+            \(toolGuidelines)
+
+            **Rules that must always be followed:**
+            - Only call tools listed above. Never call a tool that is not in the list above, even if you believe it exists.
+            - If a tool call returns an error, do not retry the same call. Explain the problem to the user instead.
+            - Do not call multiple tools in the same round unless they are fully independent.
+
+            # Response Formatting
             Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
-
             - Use **bold** for emphasis on important points
             - Use `inline code` for variable names, commands, or short code snippets
-            - Use code blocks with language specification for multi-line code
-            - Use headings (## Heading) to structure longer responses
-            - Use bullet lists (-) or numbered lists (1.) for multiple items
+            - Use fenced code blocks with language tags for multi-line code
+            - Use ## headings to structure longer responses
+            - Use bullet lists or numbered lists for multiple items
             - Use > blockquotes for important notes or warnings
-            - Use tables when comparing multiple items with different attributes
-
-            Always format your responses in Markdown to make them clear and easy to read.
+            - Use tables when comparing multiple items
             """
+
         if !customPrompt.isEmpty {
             systemContent += "\n\n# Custom Instructions\n\(customPrompt)"
         }
+
         var all: [[String: Any]] = [["role": "system", "content": systemContent]]
         all.append(contentsOf: messages)
         AppLogger.chat.debug("📋 buildMessages: システムプロンプト追加後 \(all.count)件")

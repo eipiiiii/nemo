@@ -1,12 +1,5 @@
-//
-//  SettingsViewModel.swift
-//  nemo
-//
-//  Created by 林栄介 on 2026/01/31.
-//
-
-import Foundation
 import Combine
+import Foundation
 import os
 
 @MainActor
@@ -17,12 +10,14 @@ class SettingsViewModel: ObservableObject {
     @Published var selectedModelId = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var searxngUrl = "http://localhost:8080"
 
     private let service = OpenRouterService()
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
     private let customPromptKey = "custom_prompt"
     private let selectedModelKey = "selected_model_id"
+    private let searxngUrlKey = "searxng_url"
 
     init() {
         AppLogger.settings.info("⚙️ SettingsViewModel init")
@@ -31,10 +26,7 @@ class SettingsViewModel: ObservableObject {
 
     func saveApiKey() {
         let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            AppLogger.settings.warning("⚠️ saveApiKey スキップ: 空文字")
-            return
-        }
+        guard !trimmed.isEmpty else { return }
         apiKey = trimmed
         do {
             try keychain.save(trimmed, forKey: apiKeyKeychainKey)
@@ -47,39 +39,41 @@ class SettingsViewModel: ObservableObject {
 
     func saveCustomPrompt() {
         UserDefaults.standard.set(customPrompt, forKey: customPromptKey)
-        AppLogger.settings.info("✅ saveCustomPrompt: \(self.customPrompt.count)文字")
+    }
+
+    func saveSearxngUrl() {
+        let trimmed = searxngUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        searxngUrl = trimmed
+        UserDefaults.standard.set(trimmed, forKey: searxngUrlKey)
+        AppLogger.settings.info("✅ saveSearxngUrl: \(trimmed)")
     }
 
     func loadSettings() {
         apiKey = keychain.load(forKey: apiKeyKeychainKey) ?? ""
         customPrompt = UserDefaults.standard.string(forKey: customPromptKey) ?? ""
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
-        AppLogger.settings.info("⚙️ loadSettings: apiKey文字数=\(self.apiKey.count) model=\(self.selectedModelId)")
+        searxngUrl = UserDefaults.standard.string(forKey: searxngUrlKey) ?? "http://localhost:8080"
+        AppLogger.settings.info("⚙️ loadSettings 完了")
     }
 
     func selectModel(_ model: Model) {
         selectedModelId = model.id
         UserDefaults.standard.set(selectedModelId, forKey: selectedModelKey)
-        AppLogger.settings.info("✅ selectModel: \(model.id)")
     }
 
     func fetchModels() {
         guard !apiKey.isEmpty else {
-            AppLogger.settings.warning("⚠️ fetchModels スキップ: APIキーなし")
             errorMessage = "APIキーを入力してください"
             return
         }
-        AppLogger.settings.info("📊 fetchModels 開始")
         isLoading = true
         errorMessage = nil
-
         Task {
             do {
                 let models = try await service.getModels(apiKey: apiKey)
                 self.models = models
-                AppLogger.settings.info("✅ fetchModels 完了: \(models.count)件")
             } catch {
-                AppLogger.settings.error("❌ fetchModels エラー: \(error)")
                 self.errorMessage = error.localizedDescription
             }
             self.isLoading = false
