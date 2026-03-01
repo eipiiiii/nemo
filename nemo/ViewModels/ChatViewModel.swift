@@ -15,6 +15,9 @@ final class ChatViewModel: ObservableObject {
     @Published var isStreaming: Bool = false
     @Published var toolCallStatus: String? = nil
 
+    /// maxToolRounds 到達時に true になる → View がバナーを表示
+    @Published var awaitingContinuationChoice: Bool = false
+
     private let conversationId: UUID
     private let modelContext: ModelContext
     private let openRouterService = OpenRouterService()
@@ -22,10 +25,13 @@ final class ChatViewModel: ObservableObject {
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
 
-    /// tool ループの最大ラウンド数
-    private let maxToolRounds = 5
+    /// 1セッションあたりの tool ラウンド上限
+    private let maxToolRoundsPerSession = 5
 
     private var streamingTask: Task<Void, Never>?
+
+    /// ユーザーの続行 or 終了の選択を待つ continuation
+    private var continuationChoice: CheckedContinuation<Bool, Never>?
 
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
@@ -43,6 +49,26 @@ final class ChatViewModel: ObservableObject {
         messages = (try? modelContext.fetch(descriptor)) ?? []
         AppLogger.chat.debug("💬 loadMessages: \(self.messages.count)件")
     }
+
+    // MARK: - ユーザーの続行選択
+
+    /// View の「続行する」ボタンから呼ぶ
+    func continueTool() {
+        AppLogger.chat.info("▶️ continueTool: ユーザーが続行を選択")
+        awaitingContinuationChoice = false
+        continuationChoice?.resume(returning: true)
+        continuationChoice = nil
+    }
+
+    /// View の「まとめて回答」ボタンから呼ぶ
+    func finishTool() {
+        AppLogger.chat.info("⏹️ finishTool: ユーザーが終了を選択")
+        awaitingContinuationChoice = false
+        continuationChoice?.resume(returning: false)
+        continuationChoice = nil
+    }
+
+    // MARK: - Send
 
     func sendMessage() {
         let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -74,6 +100,7 @@ final class ChatViewModel: ObservableObject {
         isStreaming = true
         streamingContent = ""
         toolCallStatus = nil
+        awaitingContinuationChoice = false
 
         streamingTask = Task {
             do {
@@ -90,6 +117,7 @@ final class ChatViewModel: ObservableObject {
                 isStreaming = false
                 streamingContent = ""
                 toolCallStatus = nil
+                awaitingContinuationChoice = false
                 streamingTask = nil
                 AppLogger.chat.info("🏁 sendMessage Task 終了")
             }
@@ -105,95 +133,144 @@ final class ChatViewModel: ObservableObject {
     ) async throws {
         var messages = buildMessagesWithSystemPrompt(initialMessages)
         let tools = toolRegistry.availableTools
+        var totalRounds = 0
 
-        AppLogger.chat.info("🤖 runAgentLoop 開始: maxRounds=\(self.maxToolRounds) tools=\(tools.count)件")
+        AppLogger.chat.info("🤖 runAgentLoop 開始: maxRoundsPerSession=\(self.maxToolRoundsPerSession) tools=\(tools.count)件")
 
-        for round in 0 ..< maxToolRounds {
-            guard !Task.isCancelled else {
-                AppLogger.chat.info("⏹️ runAgentLoop キャンセル: round=\(round)")
-                return
-            }
-            AppLogger.chat.info("🔄 ラウンド \(round + 1)/\(self.maxToolRounds) 開始: messages=\(messages.count)件")
+        // ユーザーが「続行する」を選ぶ限りセッションを繰り返す
+        while true {
+            let sessionLimit = totalRounds + maxToolRoundsPerSession
 
-            let result = try await openRouterService.sendRound(
-                messages: messages,
-                modelId: modelId,
-                tools: tools,
-                apiKey: apiKey
-            ) { [weak self] chunk in
-                guard let self else { return }
-                await MainActor.run { self.streamingContent += chunk }
-            }
-
-            switch result {
-            case .toolCalls(let toolCalls, let assistantContent):
-                AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.name }.joined(separator: ", "))")
-
-                // ① 中間テキストがあれば tool_use より先に DB 保存
-                //    → timestamp 順で assistant が tool_use の上に来る
-                if let content = assistantContent, !content.isEmpty {
-                    let intermediateMsg = Conversation(
-                        id: UUID(), role: "assistant", content: content,
-                        timestamp: Date(), conversationId: conversationId
-                    )
-                    modelContext.insert(intermediateMsg)
-                    try? modelContext.save()
-                    loadMessages()
-                    // UI のストリーミング表示はリセット（DB に永続化済み）
-                    streamingContent = ""
-                    AppLogger.chat.info("💾 中間 assistant メッセージ保存: \(content.count)文字")
-                }
-
-                // ② assistant メッセージをAPIコンテキストに追加
-                var assistantMsg: [String: Any] = ["role": "assistant"]
-                if let content = assistantContent { assistantMsg["content"] = content }
-                assistantMsg["tool_calls"] = toolCalls.map { tc -> [String: Any] in
-                    [
-                        "id": tc.id,
-                        "type": "function",
-                        "function": ["name": tc.name, "arguments": tc.arguments] as [String: Any],
-                    ]
-                }
-                messages.append(assistantMsg)
-
-                // ③ tool を順番に実行・保存（timestamp が必ず assistant より後）
-                for toolCall in toolCalls {
-                    AppLogger.chat.info("🔧 tool call: \(toolCall.name) args=\(toolCall.arguments)")
-                    await MainActor.run { toolCallStatus = "🔧 \(toolCall.name) 実行中..." }
-                    AppLogger.tool.info("▶️ tool 実行: \(toolCall.name) id=\(toolCall.id)")
-
-                    let toolResult = await toolRegistry.execute(
-                        toolCallId: toolCall.id,
-                        name: toolCall.name,
-                        arguments: toolCall.arguments
-                    )
-                    AppLogger.tool.info("✅ tool 結果: \(toolResult.content)")
-
-                    let toolBlock = Conversation(
-                        id: UUID(), role: "tool_use", content: "",
-                        timestamp: Date(), conversationId: conversationId,
-                        toolName: toolResult.name, toolResult: toolResult.content
-                    )
-                    modelContext.insert(toolBlock)
-                    try? modelContext.save()
-                    loadMessages()
-
-                    messages.append([
-                        "role": "tool",
-                        "tool_call_id": toolResult.toolCallId,
-                        "content": toolResult.content,
-                    ])
-                }
-                await MainActor.run { toolCallStatus = nil }
-
-            case .finished:
-                AppLogger.chat.info("✅ ラウンド \(round + 1): 最終回答完了 \(self.streamingContent.count)文字")
-                AppLogger.chat.info("🤖 モデル最終回答:\n\(self.streamingContent)")
-
-                guard !Task.isCancelled, !streamingContent.isEmpty else {
-                    AppLogger.chat.warning("⚠️ ストリーミング: キャンセル or 空")
+            // 1セッション分のループ
+            var sessionFinished = false
+            while totalRounds < sessionLimit {
+                guard !Task.isCancelled else {
+                    AppLogger.chat.info("⏹️ runAgentLoop キャンセル: round=\(totalRounds)")
                     return
                 }
+                totalRounds += 1
+                AppLogger.chat.info("🔄 ラウンド \(totalRounds) 開始: messages=\(messages.count)件")
+
+                let result = try await openRouterService.sendRound(
+                    messages: messages,
+                    modelId: modelId,
+                    tools: tools,
+                    apiKey: apiKey
+                ) { [weak self] chunk in
+                    guard let self else { return }
+                    await MainActor.run { self.streamingContent += chunk }
+                }
+
+                switch result {
+                case .toolCalls(let toolCalls, let assistantContent):
+                    AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.name }.joined(separator: ", "))")
+
+                    // 中間テキストがあれば tool_use より先に DB 保存
+                    if let content = assistantContent, !content.isEmpty {
+                        let intermediateMsg = Conversation(
+                            id: UUID(), role: "assistant", content: content,
+                            timestamp: Date(), conversationId: conversationId
+                        )
+                        modelContext.insert(intermediateMsg)
+                        try? modelContext.save()
+                        loadMessages()
+                        streamingContent = ""
+                        AppLogger.chat.info("💾 中間 assistant メッセージ保存: \(content.count)文字")
+                    }
+
+                    var assistantMsg: [String: Any] = ["role": "assistant"]
+                    if let content = assistantContent { assistantMsg["content"] = content }
+                    assistantMsg["tool_calls"] = toolCalls.map { tc -> [String: Any] in
+                        [
+                            "id": tc.id,
+                            "type": "function",
+                            "function": ["name": tc.name, "arguments": tc.arguments] as [String: Any],
+                        ]
+                    }
+                    messages.append(assistantMsg)
+
+                    for toolCall in toolCalls {
+                        AppLogger.chat.info("🔧 tool call: \(toolCall.name) args=\(toolCall.arguments)")
+                        await MainActor.run { toolCallStatus = "🔧 \(toolCall.name) 実行中..." }
+
+                        let toolResult = await toolRegistry.execute(
+                            toolCallId: toolCall.id,
+                            name: toolCall.name,
+                            arguments: toolCall.arguments
+                        )
+                        AppLogger.tool.info("✅ tool 結果: \(toolResult.content)")
+
+                        let toolBlock = Conversation(
+                            id: UUID(), role: "tool_use", content: "",
+                            timestamp: Date(), conversationId: conversationId,
+                            toolName: toolResult.name, toolResult: toolResult.content
+                        )
+                        modelContext.insert(toolBlock)
+                        try? modelContext.save()
+                        loadMessages()
+
+                        messages.append([
+                            "role": "tool",
+                            "tool_call_id": toolResult.toolCallId,
+                            "content": toolResult.content,
+                        ])
+                    }
+                    await MainActor.run { toolCallStatus = nil }
+
+                case .finished:
+                    AppLogger.chat.info("✅ ラウンド \(totalRounds): 最終回答完了 \(self.streamingContent.count)文字")
+                    guard !Task.isCancelled, !streamingContent.isEmpty else {
+                        AppLogger.chat.warning("⚠️ ストリーミング: キャンセル or 空")
+                        return
+                    }
+                    let assistantMessage = Conversation(
+                        id: UUID(), role: "assistant", content: streamingContent,
+                        timestamp: Date(), conversationId: conversationId
+                    )
+                    modelContext.insert(assistantMessage)
+                    try? modelContext.save()
+                    loadMessages()
+                    sessionFinished = true
+                    return
+                }
+            }
+
+            if sessionFinished { return }
+
+            // セッション上限到達 → ユーザーに選択させる
+            AppLogger.chat.warning("⚠️ \(totalRounds)ラウンド到達 → ユーザーに続行確認")
+            await MainActor.run {
+                toolCallStatus = nil
+                awaitingContinuationChoice = true
+            }
+
+            // ユーザーの選択を待機（続行: true / 終了: false）
+            let shouldContinue = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                self.continuationChoice = cont
+            }
+
+            if shouldContinue {
+                // さらに maxToolRoundsPerSession ラウンド許可して while ループ継続
+                AppLogger.chat.info("▶️ 続行: さらに\(self.maxToolRoundsPerSession)ラウンド追加")
+                continue
+            } else {
+                // 強制終了: tool なし + まとめ指示メッセージ
+                AppLogger.chat.info("⏹️ 終了: まとめ回答へ")
+                messages.append([
+                    "role": "user",
+                    "content": "You have reached the maximum number of tool calls. Do NOT call any more tools or output tool_call tags. Summarize everything you have gathered so far and provide your final answer now.",
+                ])
+                let _ = try await openRouterService.sendRound(
+                    messages: messages,
+                    modelId: modelId,
+                    tools: [],
+                    apiKey: apiKey
+                ) { [weak self] chunk in
+                    guard let self else { return }
+                    await MainActor.run { self.streamingContent += chunk }
+                }
+                guard !Task.isCancelled, !streamingContent.isEmpty else { return }
+                AppLogger.chat.info("🤖 まとめ回答:\n\(self.streamingContent)")
                 let assistantMessage = Conversation(
                     id: UUID(), role: "assistant", content: streamingContent,
                     timestamp: Date(), conversationId: conversationId
@@ -204,28 +281,6 @@ final class ChatViewModel: ObservableObject {
                 return
             }
         }
-
-        // maxToolRounds 到達時: ストリーミングで強制終了
-        AppLogger.chat.warning("⚠️ maxToolRounds(\(self.maxToolRounds)) 到達 → 強制終了")
-        await MainActor.run { toolCallStatus = nil }
-        let _ = try await openRouterService.sendRound(
-            messages: messages,
-            modelId: modelId,
-            tools: [],
-            apiKey: apiKey
-        ) { [weak self] chunk in
-            guard let self else { return }
-            await MainActor.run { self.streamingContent += chunk }
-        }
-        guard !Task.isCancelled, !streamingContent.isEmpty else { return }
-        AppLogger.chat.info("🤖 モデル最終回答 (maxRounds強制):\n\(self.streamingContent)")
-        let assistantMessage = Conversation(
-            id: UUID(), role: "assistant", content: streamingContent,
-            timestamp: Date(), conversationId: conversationId
-        )
-        modelContext.insert(assistantMessage)
-        try? modelContext.save()
-        loadMessages()
     }
 
     // MARK: - System Prompt
@@ -292,6 +347,12 @@ final class ChatViewModel: ObservableObject {
 
     func cancelStreaming() {
         AppLogger.chat.info("⏹️ cancelStreaming")
+        // 選択待ち中にキャンセルされた場合は continuation を終了で解決
+        if awaitingContinuationChoice {
+            continuationChoice?.resume(returning: false)
+            continuationChoice = nil
+            awaitingContinuationChoice = false
+        }
         streamingTask?.cancel()
         streamingTask = nil
         if !streamingContent.isEmpty {

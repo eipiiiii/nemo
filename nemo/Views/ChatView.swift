@@ -47,9 +47,17 @@ struct ChatView: View {
                             .id("streaming")
                     }
                     // ストリーミング開始直後（まだ文字が来ていない）
-                    if viewModel.isStreaming && viewModel.streamingContent.isEmpty && viewModel.toolCallStatus == nil {
+                    if viewModel.isStreaming && viewModel.streamingContent.isEmpty && viewModel.toolCallStatus == nil && !viewModel.awaitingContinuationChoice {
                         TypingIndicatorView()
                             .id("typing")
+                    }
+                    // ツール上限到達バナー
+                    if viewModel.awaitingContinuationChoice {
+                        ContinuationChoiceView(
+                            onContinue: { viewModel.continueTool() },
+                            onFinish: { viewModel.finishTool() }
+                        )
+                        .id("continuation")
                     }
                 }
                 .padding()
@@ -57,7 +65,6 @@ struct ChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
-            // messages 追加時（次の runloop でスクロール → Publishing changes 警告を回避）
             .onChange(of: viewModel.messages.count) { _, _ in
                 guard let last = viewModel.messages.last else { return }
                 DispatchQueue.main.async {
@@ -70,13 +77,18 @@ struct ChatView: View {
                     withAnimation { proxy.scrollTo("tool_progress", anchor: .bottom) }
                 }
             }
+            .onChange(of: viewModel.awaitingContinuationChoice) { _, waiting in
+                guard waiting else { return }
+                DispatchQueue.main.async {
+                    withAnimation { proxy.scrollTo("continuation", anchor: .bottom) }
+                }
+            }
             .onChange(of: viewModel.isStreaming) { _, isStreaming in
                 guard isStreaming else { return }
                 DispatchQueue.main.async {
                     withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
                 }
             }
-            // throttleで 120ms 間引き → onChange multiple-per-frame 警告を回避
             .onReceive(
                 viewModel.$streamingContent
                     .throttle(for: .milliseconds(120), scheduler: RunLoop.main, latest: true)
@@ -150,6 +162,38 @@ struct ChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+    }
+}
+
+// MARK: - Continuation Choice Banner
+
+struct ContinuationChoiceView: View {
+    let onContinue: () -> Void
+    let onFinish: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.trianglehead.2.clockwise")
+                .foregroundStyle(.orange)
+            Text("ツール呼び出しが5回に達しました。続行しますか？")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("続行する") { onContinue() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(.orange)
+            Button("まとめて回答") { onFinish() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.orange.opacity(0.3), lineWidth: 0.5)
         }
     }
 }
