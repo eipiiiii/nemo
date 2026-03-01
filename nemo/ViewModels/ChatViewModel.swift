@@ -249,26 +249,58 @@ final class ChatViewModel: ObservableObject {
 
     private func buildMessagesWithSystemPrompt(_ messages: [[String: Any]]) -> [[String: Any]] {
         let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
+        let availableToolNames = toolRegistry.availableTools.map { $0.name }.sorted().joined(separator: ", ")
+
+        // 現在時刻・タイムゾーンを動的に生成
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm (EEEE)"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let tz = TimeZone.current
+        formatter.timeZone = tz
+        let currentTimeString = formatter.string(from: now)
+        let tzName = tz.identifier  // e.g. "Asia/Tokyo"
+
         var systemContent = """
-            You are a helpful AI assistant.
-            Provide accurate, concise, and well-structured responses.
+            You are nemo, a helpful AI assistant running on macOS.
 
-            # Formatting Guidelines
+            <environment>
+            Current time: \(currentTimeString)
+            Timezone: \(tzName)
+            </environment>
+
+            # Core Principles
+            - Be accurate, concise, and honest.
+            - If you are unsure about something, say so rather than guessing.
+            - For time-sensitive information (news, weather, prices, etc.), always use tools to get up-to-date data instead of relying on training knowledge.
+
+            # Tools
+            You have access to the following tools: \(availableToolNames)
+
+            **IMPORTANT — Tool Usage Rules:**
+            - Only call tools that are listed above. Never invent or assume the existence of tools not listed.
+            - Use `web_search` when the user asks for current events, news, live data, or anything that may have changed after your training cutoff.
+            - Use `fetch_page` to retrieve the full content of a specific URL after finding it via `web_search`.
+            - Use `get_current_time` when the user asks for the current date or time.
+            - Use `get_weather` when the user asks for weather information.
+            - Use `open_url` to open a URL in the user's browser when explicitly asked to do so.
+            - When a tool returns an error, do not retry the same call repeatedly. Explain the issue to the user instead.
+
+            # Response Formatting
             Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
-
             - Use **bold** for emphasis on important points
             - Use `inline code` for variable names, commands, or short code snippets
-            - Use code blocks with language specification for multi-line code
-            - Use headings (## Heading) to structure longer responses
-            - Use bullet lists (-) or numbered lists (1.) for multiple items
+            - Use fenced code blocks with language tags for multi-line code
+            - Use ## headings to structure longer responses
+            - Use bullet lists or numbered lists for multiple items
             - Use > blockquotes for important notes or warnings
-            - Use tables when comparing multiple items with different attributes
-
-            Always format your responses in Markdown to make them clear and easy to read.
+            - Use tables when comparing multiple items
             """
+
         if !customPrompt.isEmpty {
             systemContent += "\n\n# Custom Instructions\n\(customPrompt)"
         }
+
         var all: [[String: Any]] = [["role": "system", "content": systemContent]]
         all.append(contentsOf: messages)
         AppLogger.chat.debug("📋 buildMessages: システムプロンプト追加後 \(all.count)件")
