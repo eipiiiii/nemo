@@ -85,13 +85,6 @@ final class ChatViewModel: ObservableObject {
         toolCallStatus = nil
 
         streamingTask = Task {
-            defer {
-                isStreaming = false
-                streamingContent = ""
-                toolCallStatus = nil
-                streamingTask = nil
-                AppLogger.chat.info("🏁 sendMessage Task 終了")
-            }
             do {
                 try await runAgentLoop(
                     initialMessages: historyMessages,
@@ -100,7 +93,18 @@ final class ChatViewModel: ObservableObject {
                 )
             } catch {
                 AppLogger.chat.error("❌ sendMessage エラー: \(error)")
-                errorMessage = error.localizedDescription
+                // @MainActor クラス内だが非同期 Task の完了タイミングで
+                // SwiftUI のビュー更新サイクル外に出る場合があるため
+                // @Published 変更は必ず MainActor.run でラップする
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+            // defer を使わず、Task 完了後に明示的にリセット
+            await MainActor.run {
+                isStreaming = false
+                streamingContent = ""
+                toolCallStatus = nil
+                streamingTask = nil
+                AppLogger.chat.info("🏁 sendMessage Task 終了")
             }
         }
     }
@@ -161,9 +165,8 @@ final class ChatViewModel: ObservableObject {
                 messages.append(assistantMsg)
 
                 for toolCall in toolCalls {
-                    // tool call の名前と引数をログ出力
                     AppLogger.chat.info("🔧 tool call: \(toolCall.function.name) args=\(toolCall.function.arguments)")
-                    toolCallStatus = "🔧 \(toolCall.function.name) 実行中..."
+                    await MainActor.run { toolCallStatus = "🔧 \(toolCall.function.name) 実行中..." }
                     AppLogger.tool.info("▶️ tool 実行: \(toolCall.function.name) id=\(toolCall.id)")
 
                     let result = await toolRegistry.execute(
@@ -187,7 +190,6 @@ final class ChatViewModel: ObservableObject {
                     try? modelContext.save()
                     loadMessages()
 
-                    // API コンテキストに tool 結果を追加
                     messages.append([
                         "role": "tool",
                         "tool_call_id": result.toolCallId,
@@ -199,7 +201,7 @@ final class ChatViewModel: ObservableObject {
 
             // 最終回答: ストリーミング
             AppLogger.chat.info("🌊 ラウンド \(round + 1): toolなし → ストリーミング開始")
-            toolCallStatus = nil
+            await MainActor.run { toolCallStatus = nil }
 
             for try await chunk in openRouterService.sendMessageStream(
                 messages: messages,
@@ -207,7 +209,7 @@ final class ChatViewModel: ObservableObject {
                 apiKey: apiKey
             ) {
                 guard !Task.isCancelled else { return }
-                streamingContent += chunk
+                await MainActor.run { streamingContent += chunk }
             }
 
             guard !Task.isCancelled, !streamingContent.isEmpty else {
@@ -215,7 +217,6 @@ final class ChatViewModel: ObservableObject {
                 return
             }
 
-            // 最終回答の全文をログ出力
             AppLogger.chat.info("✅ ストリーミング完了: \(self.streamingContent.count)文字")
             AppLogger.chat.info("🤖 モデル最終回答:\n\(self.streamingContent)")
 
@@ -234,18 +235,17 @@ final class ChatViewModel: ObservableObject {
 
         // maxToolRounds 到達時
         AppLogger.chat.warning("⚠️ maxToolRounds(\(self.maxToolRounds)) 到達 → ストリーミングで強制終了")
-        toolCallStatus = nil
+        await MainActor.run { toolCallStatus = nil }
         for try await chunk in openRouterService.sendMessageStream(
             messages: messages,
             modelId: modelId,
             apiKey: apiKey
         ) {
             guard !Task.isCancelled else { return }
-            streamingContent += chunk
+            await MainActor.run { streamingContent += chunk }
         }
         guard !Task.isCancelled, !streamingContent.isEmpty else { return }
 
-        // maxRounds 到達時の強制回答もログ出力
         AppLogger.chat.info("🤖 モデル最終回答 (maxRounds強制):\n\(self.streamingContent)")
 
         let assistantMessage = Conversation(
@@ -265,7 +265,6 @@ final class ChatViewModel: ObservableObject {
     private func buildMessagesWithSystemPrompt(_ messages: [[String: Any]]) -> [[String: Any]] {
         let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
 
-        // 現在時刻・タイムゾーンを動的生成
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm (EEEE)"
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -273,9 +272,6 @@ final class ChatViewModel: ObservableObject {
         let currentTimeString = formatter.string(from: Date())
         let tzName = TimeZone.current.identifier
 
-        // ToolRegistry から tool ガイドラインを動的生成
-        // 各 tool の description をそのまま活用するため、
-        // description の品質改善 = プロンプト品質の改善 に直結する
         let toolGuidelines = toolRegistry.availableTools
             .sorted { $0.name < $1.name }
             .map { "- `\($0.name)`: \($0.function.description)" }
