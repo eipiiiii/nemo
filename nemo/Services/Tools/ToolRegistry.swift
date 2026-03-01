@@ -7,7 +7,6 @@ final class ToolRegistry: @unchecked Sendable {
     static let shared: ToolRegistry = {
         ToolRegistry(tools: [
             GetCurrentTimeTool(),
-            GetWeatherTool(),
             OpenURLTool(),
             FetchPageTool(),
             WebSearchTool(),
