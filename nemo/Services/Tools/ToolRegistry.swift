@@ -32,8 +32,13 @@ final class ToolRegistry: @unchecked Sendable {
     func execute(toolCallId: String, name: String, arguments: String) async -> ToolResult {
         AppLogger.tool.info("▶️ ToolRegistry.execute: name=\(name) id=\(toolCallId)")
         guard let tool = tools[name] else {
+            let available = tools.keys.sorted().joined(separator: ", ")
             AppLogger.tool.warning("⚠️ 未知の tool: \(name)")
-            return ToolResult(toolCallId: toolCallId, name: name, content: "未知のツール: \(name)")
+            return ToolResult(
+                toolCallId: toolCallId,
+                name: name,
+                content: "エラー: ツール '\(name)' は存在しません。利用可能なツールは \(available) のみです。"
+            )
         }
         let content = await tool.execute(arguments: arguments)
         AppLogger.tool.info("✅ ToolRegistry.execute 完了: name=\(name) result=\(content.prefix(100))")
