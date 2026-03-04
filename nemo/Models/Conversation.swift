@@ -23,6 +23,9 @@ final class Conversation {
     // tool_use ブロック専用フィールド（role == "tool_use" のときのみ使用）
     var toolName: String?
     var toolResult: String?
+    
+    // 画像データ（base64エンコード用等の生データ）
+    var imageData: [Data]?
 
     init(
         id: UUID = UUID(),
@@ -31,7 +34,8 @@ final class Conversation {
         timestamp: Date = Date(),
         conversationId: UUID = UUID(),
         toolName: String? = nil,
-        toolResult: String? = nil
+        toolResult: String? = nil,
+        imageData: [Data]? = nil
     ) {
         self.id = id
         self.role = role
@@ -40,5 +44,6 @@ final class Conversation {
         self.conversationId = conversationId
         self.toolName = toolName
         self.toolResult = toolResult
+        self.imageData = imageData
     }
 }

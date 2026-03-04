@@ -9,6 +9,7 @@ import Combine
 import MarkdownUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ChatView: View {
     let conversationId: UUID
@@ -17,6 +18,7 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @AppStorage("selected_model_id") private var selectedModelId: String = ""
     @State private var showingSettings = false
+    @State private var isImagePickerPresented = false
 
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
@@ -158,7 +160,45 @@ struct ChatView: View {
                 .background(Color.orange.opacity(0.1))
             }
 
+            if !viewModel.selectedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.selectedImages.indices, id: \.self) { index in
+                            if let nsImage = NSImage(data: viewModel.selectedImages[index]) {
+                                Image(nsImage: nsImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(alignment: .topTrailing) {
+                                        Button {
+                                            viewModel.selectedImages.remove(at: index)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundStyle(.white, .black.opacity(0.6))
+                                                .padding(2)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                }
+            }
+
             HStack(alignment: .bottom, spacing: 12) {
+                Button {
+                    isImagePickerPresented = true
+                } label: {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 8)
+
                 TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
@@ -189,6 +229,24 @@ struct ChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+        .fileImporter(
+            isPresented: $isImagePickerPresented,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                for url in urls {
+                    guard url.startAccessingSecurityScopedResource() else { continue }
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        viewModel.selectedImages.append(data)
+                    }
+                }
+            case .failure(let error):
+                viewModel.errorMessage = "画像の読み込みに失敗しました: \(error.localizedDescription)"
+            }
         }
     }
 }
@@ -350,11 +408,30 @@ struct MessageBubbleView: View {
 
             Group {
                 if message.role == "user" {
-                    Text(message.content)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .foregroundStyle(.primary)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
+                    VStack(alignment: .trailing, spacing: 8) {
+                        if let imageData = message.imageData, !imageData.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(imageData, id: \.self) { data in
+                                        if let nsImage = NSImage(data: data) {
+                                            Image(nsImage: nsImage)
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(maxHeight: 200)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if !message.content.isEmpty {
+                            Text(message.content)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(.primary)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
                 } else {
                     Markdown(message.content)
                         .markdownTheme(

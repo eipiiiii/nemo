@@ -10,6 +10,7 @@ final class ChatViewModel: ObservableObject {
     @Published var messageText: String = ""
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
+    @Published var selectedImages: [Data] = []
 
     @Published var streamingContent: String = ""
     @Published var isStreaming: Bool = false
@@ -72,8 +73,8 @@ final class ChatViewModel: ObservableObject {
 
     func sendMessage() {
         let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isLoading, !isStreaming else {
-            AppLogger.chat.warning("⚠️ sendMessage スキップ: empty=\(trimmed.isEmpty) loading=\(self.isLoading) streaming=\(self.isStreaming)")
+        guard (!trimmed.isEmpty || !selectedImages.isEmpty), !isLoading, !isStreaming else {
+            AppLogger.chat.warning("⚠️ sendMessage スキップ: empty=\(trimmed.isEmpty && self.selectedImages.isEmpty) loading=\(self.isLoading) streaming=\(self.isStreaming)")
             return
         }
         guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
@@ -86,16 +87,35 @@ final class ChatViewModel: ObservableObject {
 
         let userMessage = Conversation(
             id: UUID(), role: "user", content: trimmed,
-            timestamp: Date(), conversationId: conversationId
+            timestamp: Date(), conversationId: conversationId,
+            imageData: selectedImages.isEmpty ? nil : selectedImages
         )
         modelContext.insert(userMessage)
         try? modelContext.save()
         loadMessages()
         messageText = ""
+        selectedImages = []
 
         let historyMessages: [[String: Any]] = messages
             .filter { $0.role != "tool_use" }
-            .map { ["role": $0.role, "content": $0.content] }
+            .map { msg in
+                if let imageData = msg.imageData, !imageData.isEmpty {
+                    var contentParts: [[String: Any]] = []
+                    if !msg.content.isEmpty {
+                        contentParts.append(["type": "text", "text": msg.content])
+                    }
+                    for data in imageData {
+                        let base64 = data.base64EncodedString()
+                        contentParts.append([
+                            "type": "image_url",
+                            "image_url": ["url": "data:image/jpeg;base64,\(base64)"]
+                        ])
+                    }
+                    return ["role": msg.role, "content": contentParts]
+                } else {
+                    return ["role": msg.role, "content": msg.content]
+                }
+            }
 
         isStreaming = true
         streamingContent = ""

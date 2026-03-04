@@ -267,7 +267,14 @@ struct ModelSelectionView: View {
                             Button(action: { viewModel.selectModel(model); dismiss() }) {
                                 HStack(alignment: .top, spacing: 12) {
                                     VStack(alignment: .leading, spacing: 6) {
-                                        Text(model.name).font(.headline).foregroundColor(.primary)
+                                        HStack {
+                                            Text(model.name).font(.headline).foregroundColor(.primary)
+                                            if model.supportsImageInput {
+                                                Image(systemName: "photo")
+                                                    .foregroundColor(.secondary)
+                                                    .font(.caption)
+                                            }
+                                        }
                                         if let description = model.description {
                                             Text(description).font(.caption).foregroundColor(.secondary).lineLimit(2)
                                         }

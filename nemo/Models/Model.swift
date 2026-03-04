@@ -64,3 +64,12 @@ extension Model.Architecture {
         case instructType = "instruct_type"
     }
 }
+
+extension Model {
+    var supportsImageInput: Bool {
+        guard let modality = architecture?.modality else { return false }
+        let components = modality.components(separatedBy: "->")
+        guard let inputModality = components.first else { return false }
+        return inputModality.contains("image")
+    }
+}
