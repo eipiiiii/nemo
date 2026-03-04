@@ -217,13 +217,21 @@ struct SettingsView: View {
 struct ModelSelectionView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var searchText = ""
+    @State private var showImageSupportedOnly = false
     @Environment(\.dismiss) private var dismiss
 
     var filteredModels: [Model] {
-        searchText.isEmpty ? viewModel.models : viewModel.models.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.id.localizedCaseInsensitiveContains(searchText)
+        var models = viewModel.models
+        if showImageSupportedOnly {
+            models = models.filter { $0.supportsImageInput }
         }
+        if !searchText.isEmpty {
+            models = models.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.id.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        return models
     }
 
     var body: some View {
@@ -245,6 +253,13 @@ struct ModelSelectionView: View {
                         Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
                     }.buttonStyle(.plain)
                 }
+                
+                Divider()
+                    .frame(height: 16)
+                    .padding(.horizontal, 4)
+                
+                Toggle("画像対応", isOn: $showImageSupportedOnly)
+                    .toggleStyle(.checkbox)
             }
             .padding(8)
             .background(Color(nsColor: .controlBackgroundColor))
