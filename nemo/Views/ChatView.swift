@@ -43,22 +43,18 @@ struct ChatView: View {
                                 .id(message.id)
                         }
                     }
-                    // tool 実行中インジケーター
                     if let status = viewModel.toolCallStatus {
                         ToolCallProgressView(status: status)
                             .id("tool_progress")
                     }
-                    // ストリーミング中のリアルタイム表示
                     if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
                         StreamingBubbleView(content: viewModel.streamingContent)
                             .id("streaming")
                     }
-                    // ストリーミング開始直後（まだ文字が来ていない）
                     if viewModel.isStreaming && viewModel.streamingContent.isEmpty && viewModel.toolCallStatus == nil && !viewModel.awaitingContinuationChoice {
                         TypingIndicatorView()
                             .id("typing")
                     }
-                    // ツール上限到達バナー
                     if viewModel.awaitingContinuationChoice {
                         ContinuationChoiceView(
                             onContinue: { viewModel.continueTool() },
@@ -119,7 +115,6 @@ struct ChatView: View {
                     showingSettings = true
                 } label: {
                     HStack(spacing: 4) {
-                        Spacer()
                         Image(systemName: "cpu")
                             .font(.caption)
                         Text(modelDisplayName)
@@ -127,7 +122,6 @@ struct ChatView: View {
                         Image(systemName: "chevron.down")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
-                        Spacer()
                     }
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
