@@ -15,12 +15,19 @@ struct ChatView: View {
     let modelContext: ModelContext
     @StateObject private var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
+    @AppStorage("selected_model_id") private var selectedModelId: String = ""
+    @State private var showingSettings = false
 
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
         self.modelContext = modelContext
         _viewModel = StateObject(
             wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
+    }
+
+    private var modelDisplayName: String {
+        guard !selectedModelId.isEmpty else { return "モデル未選択" }
+        return selectedModelId.components(separatedBy: "/").last ?? selectedModelId
     }
 
     var body: some View {
@@ -106,6 +113,28 @@ struct ChatView: View {
             }
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "cpu")
+                            .font(.caption)
+                        Text(modelDisplayName)
+                            .font(.caption)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
