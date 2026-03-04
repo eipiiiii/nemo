@@ -11,6 +11,14 @@ class SettingsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searxngUrl = "http://localhost:8080"
+    @Published var searxngServerStatus: ServerStatus = .unknown
+
+    enum ServerStatus {
+        case unknown
+        case checking
+        case online
+        case offline
+    }
 
     private let service = OpenRouterService()
     private let keychain = KeychainService.shared
@@ -47,6 +55,7 @@ class SettingsViewModel: ObservableObject {
         searxngUrl = trimmed
         UserDefaults.standard.set(trimmed, forKey: searxngUrlKey)
         AppLogger.settings.info("✅ saveSearxngUrl: \(trimmed)")
+        checkSearxngServerStatus()
     }
 
     func loadSettings() {
@@ -55,6 +64,33 @@ class SettingsViewModel: ObservableObject {
         selectedModelId = UserDefaults.standard.string(forKey: selectedModelKey) ?? ""
         searxngUrl = UserDefaults.standard.string(forKey: searxngUrlKey) ?? "http://localhost:8080"
         AppLogger.settings.info("⚙️ loadSettings 完了")
+        checkSearxngServerStatus()
+    }
+    
+    func checkSearxngServerStatus() {
+        guard let url = URL(string: searxngUrl) else {
+            searxngServerStatus = .offline
+            return
+        }
+        
+        searxngServerStatus = .checking
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 3.0
+        
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode < 500 {
+                    self.searxngServerStatus = .online
+                } else {
+                    self.searxngServerStatus = .offline
+                }
+            } catch {
+                self.searxngServerStatus = .offline
+            }
+        }
     }
 
     func selectModel(_ model: Model) {

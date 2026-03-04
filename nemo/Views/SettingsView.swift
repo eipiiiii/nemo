@@ -81,6 +81,30 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                             Text("SearXNG (検索サーバー)")
                                 .font(.headline)
+                                
+                            Spacer()
+                            
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(statusColor(for: viewModel.searxngServerStatus))
+                                    .frame(width: 8, height: 8)
+                                Text(statusText(for: viewModel.searxngServerStatus))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Button(action: {
+                                    viewModel.checkSearxngServerStatus()
+                                }) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(12)
                         }
                         Text("Docker で起動した SearXNG サーバーの URL。web_search ツールで使用されます。")
                             .font(.caption).foregroundColor(.secondary)
@@ -158,6 +182,36 @@ struct SettingsView: View {
             ModelSelectionView(viewModel: viewModel)
         }
     }
+
+    private func statusColor(for status: SettingsViewModel.ServerStatus) -> Color {
+        switch status {
+        case .online:
+            return .green
+        case .offline:
+            return .red
+        case .checking:
+            return .orange
+        case .unknown:
+            return .gray
+        }
+    }
+
+    private func statusText(for status: SettingsViewModel.ServerStatus) -> String {
+        switch status {
+        case .online:
+            return "オンライン"
+        case .offline:
+            return "オフライン"
+        case .checking:
+            return "確認中..."
+        case .unknown:
+            return "不明"
+        }
+    }
+}
+
+#Preview {
+    SettingsView()
 }
 
 struct ModelSelectionView: View {
