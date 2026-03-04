@@ -27,7 +27,7 @@ struct ChatView: View {
 
     private var modelDisplayName: String {
         guard !selectedModelId.isEmpty else { return "モデル未選択" }
-        return selectedModelId.components(separatedBy: "/").last ?? selectedModelId
+        return selectedModelId
     }
 
     var body: some View {
@@ -119,6 +119,7 @@ struct ChatView: View {
                     showingSettings = true
                 } label: {
                     HStack(spacing: 4) {
+                        Spacer()
                         Image(systemName: "cpu")
                             .font(.caption)
                         Text(modelDisplayName)
@@ -126,8 +127,10 @@ struct ChatView: View {
                         Image(systemName: "chevron.down")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
+                        Spacer()
                     }
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
                 }
                 .buttonStyle(.plain)
             }
@@ -390,10 +393,6 @@ struct MessageBubbleView: View {
         Conversation(
             id: UUID(), role: "user", content: "現在時刻を教えて", timestamp: Date(),
             conversationId: conversationId),
-        Conversation(
-            id: UUID(), role: "tool_use", content: "", timestamp: Date(),
-            conversationId: conversationId, toolName: "get_current_time",
-            toolResult: "2026年02月27日 11:17:59 (金曜日)"),
         Conversation(
             id: UUID(), role: "assistant",
             content: "現在の時刻は **2026年02月27日 11:17:59（金曜日）** です。",
