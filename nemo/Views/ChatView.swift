@@ -161,10 +161,10 @@ struct ChatView: View {
             HStack(alignment: .bottom, spacing: 12) {
                 TextField("メッセージを入力", text: $viewModel.messageText, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .lineLimit(1...5)
                     .focused($isInputFocused)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .frame(maxHeight: 120)
                     .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20))
                     .onSubmit {
                         if viewModel.isStreaming {
