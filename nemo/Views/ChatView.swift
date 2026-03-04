@@ -15,12 +15,19 @@ struct ChatView: View {
     let modelContext: ModelContext
     @StateObject private var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
+    @AppStorage("selected_model_id") private var selectedModelId: String = ""
+    @State private var showingSettings = false
 
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
         self.modelContext = modelContext
         _viewModel = StateObject(
             wrappedValue: ChatViewModel(conversationId: conversationId, modelContext: modelContext))
+    }
+
+    private var modelDisplayName: String {
+        guard !selectedModelId.isEmpty else { return "モデル未選択" }
+        return selectedModelId
     }
 
     var body: some View {
@@ -36,22 +43,18 @@ struct ChatView: View {
                                 .id(message.id)
                         }
                     }
-                    // tool 実行中インジケーター
                     if let status = viewModel.toolCallStatus {
                         ToolCallProgressView(status: status)
                             .id("tool_progress")
                     }
-                    // ストリーミング中のリアルタイム表示
                     if viewModel.isStreaming && !viewModel.streamingContent.isEmpty {
                         StreamingBubbleView(content: viewModel.streamingContent)
                             .id("streaming")
                     }
-                    // ストリーミング開始直後（まだ文字が来ていない）
                     if viewModel.isStreaming && viewModel.streamingContent.isEmpty && viewModel.toolCallStatus == nil && !viewModel.awaitingContinuationChoice {
                         TypingIndicatorView()
                             .id("typing")
                     }
-                    // ツール上限到達バナー
                     if viewModel.awaitingContinuationChoice {
                         ContinuationChoiceView(
                             onContinue: { viewModel.continueTool() },
@@ -106,6 +109,29 @@ struct ChatView: View {
             }
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "cpu")
+                            .font(.caption)
+                        Text(modelDisplayName)
+                            .font(.caption)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -361,10 +387,6 @@ struct MessageBubbleView: View {
         Conversation(
             id: UUID(), role: "user", content: "現在時刻を教えて", timestamp: Date(),
             conversationId: conversationId),
-        Conversation(
-            id: UUID(), role: "tool_use", content: "", timestamp: Date(),
-            conversationId: conversationId, toolName: "get_current_time",
-            toolResult: "2026年02月27日 11:17:59 (金曜日)"),
         Conversation(
             id: UUID(), role: "assistant",
             content: "現在の時刻は **2026年02月27日 11:17:59（金曜日）** です。",
