@@ -1,12 +1,13 @@
 import Foundation
 import OSLog
 
-// 通信専用の型定義です
+// MARK: - Response Types
+
 nonisolated struct ModelsResponse: Codable, Sendable {
     let data: [Model]
 }
 
-// 非ストリーミング用レスポンス（tool call 対応）
+/// 非ストリーミングレスポンス（互換性のため残す）
 nonisolated struct ChatResponse: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Message: Decodable, Sendable {
@@ -20,7 +21,6 @@ nonisolated struct ChatResponse: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// tool_calls レスポンス型
 nonisolated struct ToolCallResponse: Decodable, Sendable {
     struct Function: Decodable, Sendable {
         let name: String
@@ -31,11 +31,15 @@ nonisolated struct ToolCallResponse: Decodable, Sendable {
     let function: Function
 }
 
-// ストリーミング用チャンク
+// MARK: - Streaming Types
+
+/// ストリーミングチャンク（テキスト・ tool_calls 両方対応）
 nonisolated struct StreamChunk: Decodable, Sendable {
     struct Choice: Decodable, Sendable {
         struct Delta: Decodable, Sendable {
+            let role: String?
             let content: String?
+            let tool_calls: [ToolCallDelta]?
         }
         let delta: Delta?
         let finish_reason: String?
@@ -43,7 +47,33 @@ nonisolated struct StreamChunk: Decodable, Sendable {
     let choices: [Choice]
 }
 
-// OpenRouter のエラー形式
+/// tool_calls のデルタ（引数はチャンク分割して流れる）
+nonisolated struct ToolCallDelta: Decodable, Sendable {
+    struct Function: Decodable, Sendable {
+        let name: String?
+        let arguments: String?
+    }
+    let index: Int
+    let id: String?
+    let type: String?
+    let function: Function?
+}
+
+/// ストリーミングから構築した完全な tool call
+nonisolated struct AssembledToolCall: Sendable {
+    let id: String
+    let name: String
+    let arguments: String
+}
+
+/// sendMessageStreamWithTools の1ラウンド結果
+enum StreamRoundResult: Sendable {
+    /// tool 呼び出しがある（実行して次ラウンドへ）
+    case toolCalls([AssembledToolCall], assistantContent: String?)
+    /// 最終回答（ストリーミングでUIに表示済み）
+    case finished
+}
+
 nonisolated struct ErrorEnvelope: Decodable, Sendable {
     struct Inner: Decodable, Sendable {
         let message: String?
@@ -61,48 +91,21 @@ enum NetworkError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse:
-            return "無効なレスポンスです"
+        case .invalidResponse: return "無効なレスポンスです"
         case .httpError(let code, let detail):
-            if let detail, !detail.isEmpty {
-                return "HTTPエラー: \(code)\n\(detail)"
-            }
+            if let detail, !detail.isEmpty { return "HTTPエラー: \(code)\n\(detail)" }
             return "HTTPエラー: \(code)"
-        case .noData:
-            return "データが受信されませんでした"
-        case .decodingError(let e):
-            return "データの解析に失敗しました: \(e.localizedDescription)"
-        case .missingAPIKey:
-            return "APIキーが設定されていません"
+        case .noData: return "データが受信されませんでした"
+        case .decodingError(let e): return "データの解析に失敗しました: \(e.localizedDescription)"
+        case .missingAPIKey: return "APIキーが設定されていません"
         }
     }
 }
 
+// MARK: - Service
+
 final class OpenRouterService: Sendable {
     private let baseURL = "https://openrouter.ai/api/v1"
-    private let customPromptKey = "custom_prompt"
-
-    private let systemPrompt = """
-        You are a helpful AI assistant.
-        Provide accurate, concise, and well-structured responses.
-
-        # Formatting Guidelines
-        Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
-
-        - Use **bold** for emphasis on important points
-        - Use `inline code` for variable names, commands, or short code snippets
-        - Use code blocks with language specification for multi-line code:
-          ```swift
-          let example = "code here"
-          ```
-        - Use headings (## Heading) to structure longer responses
-        - Use bullet lists (-) or numbered lists (1.) for multiple items
-        - Use > blockquotes for important notes or warnings
-        - Use tables when comparing multiple items with different attributes
-        - Use --- for horizontal rules to separate major sections if needed
-
-        Always format your responses in Markdown to make them clear and easy to read.
-        """
 
     nonisolated func getModels(apiKey: String) async throws -> [Model] {
         AppLogger.network.info("📡 getModels 開始")
@@ -112,7 +115,6 @@ final class OpenRouterService: Sendable {
         AppLogger.network.info("📡 getModels ステータス: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else {
             let msg = decodeErrorMessage(data) ?? ""
-            AppLogger.network.error("❌ getModels エラー: \(http.statusCode) \(msg)")
             throw NetworkError.httpError(http.statusCode, msg)
         }
         do {
@@ -120,23 +122,28 @@ final class OpenRouterService: Sendable {
             AppLogger.network.info("✅ getModels 完了: \(models.count) 件")
             return models
         } catch {
-            AppLogger.network.error("❌ getModels デコード失敗: \(error)")
             throw NetworkError.decodingError(error)
         }
     }
 
-    /// tool call ループ用: 非ストリーミング1ターン送信
-    nonisolated func sendMessageWithTools(
+    // MARK: - Streaming with tool_calls support
+
+    /// 1ラウンドをストリーミングで実行。
+    /// - tool 呼び出しがあれば .toolCalls を返す（API呼び出しは1回）。
+    /// - 最終回答のテキストは onChunk コールバックでUIにその場で流す。
+    nonisolated func sendRound(
         messages: [[String: Any]],
         modelId: String,
         tools: [ToolDefinition],
-        apiKey: String
-    ) async throws -> ChatResponse.Choice {
-        AppLogger.network.info("📤 sendMessageWithTools 開始 model=\(modelId) messages=\(messages.count)件 tools=\(tools.count)件")
+        apiKey: String,
+        onChunk: @Sendable (String) async -> Void
+    ) async throws -> StreamRoundResult {
+        AppLogger.network.info("📤 sendRound 開始 model=\(modelId) messages=\(messages.count)件 tools=\(tools.count)件")
 
         var body: [String: Any] = [
             "model": modelId,
             "messages": messages,
+            "stream": true,
         ]
         if !tools.isEmpty {
             let encoder = JSONEncoder()
@@ -144,94 +151,79 @@ final class OpenRouterService: Sendable {
             let toolsJSON = try JSONSerialization.jsonObject(with: toolsData)
             body["tools"] = toolsJSON
             body["tool_choice"] = "auto"
+        } else {
+            // tools が空のラウンドではツール呼び出しを API レベルで完全禁止
+            body["tool_choice"] = "none"
         }
 
         let request = try makeRequest(path: "/chat/completions", httpMethod: "POST", body: body, apiKey: apiKey)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
-
-        AppLogger.network.info("📥 sendMessageWithTools ステータス: \(http.statusCode)")
+        AppLogger.network.info("📥 sendRound SSE 接続: status=\(http.statusCode)")
         guard (200...299).contains(http.statusCode) else {
-            let msg = decodeErrorMessage(data) ?? ""
-            AppLogger.network.error("❌ sendMessageWithTools エラー: \(http.statusCode) \(msg)")
-            throw NetworkError.httpError(http.statusCode, msg)
+            var bodyText = ""
+            for try await line in bytes.lines { bodyText += line + "\n" }
+            throw NetworkError.httpError(http.statusCode, bodyText.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
-        do {
-            let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
-            guard let choice = decoded.choices.first else { throw NetworkError.noData }
-            let toolCallCount = choice.message.tool_calls?.count ?? 0
-            AppLogger.network.info("✅ sendMessageWithTools 完了: finish_reason=\(choice.finish_reason ?? "nil") tool_calls=\(toolCallCount)件")
-            return choice
-        } catch {
-            // デコード失敗時は生の JSON もログに出す
-            let raw = String(data: data, encoding: .utf8) ?? "(binary)"
-            AppLogger.network.error("❌ sendMessageWithTools デコード失敗: \(error)\nRaw: \(raw)")
-            throw NetworkError.decodingError(error)
-        }
-    }
+        // チャンクを結合するバッファ
+        // tool_calls: index ごとに id / name / arguments を結合
+        var toolCallBuffers: [Int: (id: String, name: String, arguments: String)] = [:]
+        var assistantContent: String = ""
+        var finishReason: String? = nil
+        var chunkCount = 0
 
-    // ストリーミング（最終回答用）
-    nonisolated func sendMessageStream(
-        messages: [[String: Any]],
-        modelId: String,
-        apiKey: String
-    ) -> AsyncThrowingStream<String, Error> {
-        AppLogger.streaming.info("🌊 sendMessageStream 開始 model=\(modelId) messages=\(messages.count)件")
-        return AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    let body: [String: Any] = [
-                        "model": modelId,
-                        "messages": messages,
-                        "stream": true,
-                    ]
-                    let request = try makeRequest(
-                        path: "/chat/completions",
-                        httpMethod: "POST",
-                        body: body,
-                        apiKey: apiKey
-                    )
+        for try await line in bytes.lines {
+            if line.hasPrefix(":") || line.isEmpty { continue }
+            guard line.hasPrefix("data: ") else { continue }
+            let payload = String(line.dropFirst(6))
+            if payload == "[DONE]" {
+                AppLogger.network.info("🏁 sendRound [DONE] chunks=\(chunkCount)")
+                break
+            }
+            guard let data = payload.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
+                  let choice = chunk.choices.first else { continue }
 
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard let http = response as? HTTPURLResponse else {
-                        throw NetworkError.invalidResponse
-                    }
-                    AppLogger.streaming.info("🌊 SSE 接続: status=\(http.statusCode)")
-                    guard (200...299).contains(http.statusCode) else {
-                        var bodyText = ""
-                        for try await line in bytes.lines { bodyText += line + "\n" }
-                        let trimmed = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        AppLogger.streaming.error("❌ SSE エラー: \(http.statusCode) \(trimmed)")
-                        throw NetworkError.httpError(http.statusCode, trimmed)
-                    }
+            chunkCount += 1
 
-                    var chunkCount = 0
-                    for try await line in bytes.lines {
-                        if line.hasPrefix(":") || line.isEmpty { continue }
-                        guard line.hasPrefix("data: ") else { continue }
-                        let payload = String(line.dropFirst(6))
-                        if payload == "[DONE]" {
-                            AppLogger.streaming.info("🌊 SSE [DONE] 受信 chunks=\(chunkCount)")
-                            break
-                        }
-                        guard let data = payload.data(using: .utf8) else { continue }
-                        if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                            let delta = chunk.choices.first?.delta?.content,
-                            !delta.isEmpty
-                        {
-                            chunkCount += 1
-                            continuation.yield(delta)
-                        }
-                    }
-                    AppLogger.streaming.info("✅ sendMessageStream 完了: 合計 \(chunkCount) chunks")
-                    continuation.finish()
-                } catch {
-                    AppLogger.streaming.error("❌ sendMessageStream エラー: \(error)")
-                    continuation.finish(throwing: error)
+            // finish_reason
+            if let fr = choice.finish_reason { finishReason = fr }
+
+            guard let delta = choice.delta else { continue }
+
+            // テキストデルタ
+            if let text = delta.content, !text.isEmpty {
+                assistantContent += text
+                await onChunk(text)
+            }
+
+            // tool_calls デルタ
+            if let toolDeltas = delta.tool_calls {
+                for td in toolDeltas {
+                    let idx = td.index
+                    var buf = toolCallBuffers[idx] ?? (id: "", name: "", arguments: "")
+                    if let id = td.id, !id.isEmpty { buf.id = id }
+                    if let name = td.function?.name, !name.isEmpty { buf.name += name }
+                    if let args = td.function?.arguments { buf.arguments += args }
+                    toolCallBuffers[idx] = buf
                 }
             }
         }
+
+        AppLogger.network.info("✅ sendRound 完了: finish_reason=\(finishReason ?? "nil") tool_calls=\(toolCallBuffers.count)件")
+
+        // tool_calls があればアセンブルして返す
+        if !toolCallBuffers.isEmpty {
+            let assembled = toolCallBuffers
+                .sorted { $0.key < $1.key }
+                .map { AssembledToolCall(id: $0.value.id, name: $0.value.name, arguments: $0.value.arguments) }
+            let names = assembled.map { $0.name }.joined(separator: ", ")
+            AppLogger.network.info("🔧 tool_calls 検出: \(names)")
+            return .toolCalls(assembled, assistantContent: assistantContent.isEmpty ? nil : assistantContent)
+        }
+
+        return .finished
     }
 
     // MARK: - Private
@@ -243,14 +235,8 @@ final class OpenRouterService: Sendable {
         apiKey: String
     ) throws -> URLRequest {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedKey.isEmpty else {
-            AppLogger.network.error("❌ makeRequest: APIキーなし")
-            throw NetworkError.missingAPIKey
-        }
-        guard let url = URL(string: "\(baseURL)\(path)") else {
-            AppLogger.network.error("❌ makeRequest: 無効な URL: \(self.baseURL)\(path)")
-            throw NetworkError.invalidResponse
-        }
+        guard !trimmedKey.isEmpty else { throw NetworkError.missingAPIKey }
+        guard let url = URL(string: "\(baseURL)\(path)") else { throw NetworkError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
@@ -264,10 +250,7 @@ final class OpenRouterService: Sendable {
 
     private nonisolated func decodeErrorMessage(_ data: Data) -> String? {
         if let env = try? JSONDecoder().decode(ErrorEnvelope.self, from: data),
-            let msg = env.error?.message
-        {
-            return msg
-        }
+           let msg = env.error?.message { return msg }
         return String(data: data, encoding: .utf8)
     }
 }
