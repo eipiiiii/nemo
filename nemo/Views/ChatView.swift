@@ -164,7 +164,8 @@ struct ChatView: View {
                     .focused($isInputFocused)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .glassEffect(.clear, in: .capsule)
+                    .frame(maxHeight: 120)
+                    .glassEffect(.clear, in: .roundedRectangle(cornerRadius: 20))
                     .onSubmit {
                         if viewModel.isStreaming {
                             viewModel.cancelStreaming()
