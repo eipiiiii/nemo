@@ -34,6 +34,13 @@ struct nemoApp: App {
     }
     
     init() {
+        // サンドボックス環境では NSHomeDirectory() が実際のホームを返さないため、
+        // 絶対パスを UserDefaults で明示的に指定
+        UserDefaults.standard.set(
+            "/Users/hayashieisuke/Projects/swift/nemo/nemo-agent",
+            forKey: "NemoAgentPath"
+        )
+        
         // アプリ起動時にPythonサーバーを起動
         Task { @MainActor in
             await PythonServerManager.shared.startServer()
