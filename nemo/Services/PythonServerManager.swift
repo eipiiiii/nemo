@@ -240,15 +240,16 @@ final class PythonServerManager: ObservableObject {
         // 複数の候補を試す
         let candidates: [String] = [
             // Xcode DerivedDataから3階層上がnemoリポジトリの想定
-            ((bundlePath
-                .deletingLastPathComponent as NSString)  // Debug/
-                .deletingLastPathComponent as NSString)  // Products/
-                .deletingLastPathComponent as NSString)  // Build/
-                .deletingLastPathComponent               // DerivedData project dir
+            (((bundlePath
+                .deletingLastPathComponent as NSString)
+                .deletingLastPathComponent as NSString)
+                .deletingLastPathComponent as NSString)
+                .deletingLastPathComponent
                 + "/SourcePackages/../../../nemo-agent",
             
             // Xcodeプロジェクトの兄弟ディレクトリ
-            ((bundlePath
+            (((bundlePath
+                .deletingLastPathComponent as NSString)
                 .deletingLastPathComponent as NSString)
                 .deletingLastPathComponent as NSString)
                 .deletingLastPathComponent
