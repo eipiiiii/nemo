@@ -15,7 +15,6 @@ struct nemoApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Conversation.self,
-            ToolCallBlock.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -32,19 +31,11 @@ struct nemoApp: App {
                 .environmentObject(serverManager)
         }
         .modelContainer(sharedModelContainer)
-        .commands {
-            // アプリケーション起動時にサーバーを自動起動
-            CommandGroup(replacing: .appInfo) {
-                Button("About nemo") {
-                    // About window
-                }
-            }
-        }
     }
     
     init() {
         // アプリ起動時にPythonサーバーを起動
-        Task {
+        Task { @MainActor in
             await PythonServerManager.shared.startServer()
         }
         
@@ -54,7 +45,9 @@ struct nemoApp: App {
             object: nil,
             queue: .main
         ) { _ in
-            PythonServerManager.shared.stopServer()
+            Task { @MainActor in
+                PythonServerManager.shared.stopServer()
+            }
         }
     }
 }
