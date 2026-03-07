@@ -42,8 +42,12 @@ final class PythonServerManager: ObservableObject {
             logger.info("Python path: \(pythonPath)")
             logger.info("Project path: \(projectPath)")
             
+            // シンボリックリンクを解決して実体パスを取得
+            let resolvedPythonPath = (pythonPath as NSString).resolvingSymlinksInPath
+            logger.info("✅ Resolved Python path: \(resolvedPythonPath)")
+            
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: pythonPath)
+            process.executableURL = URL(fileURLWithPath: resolvedPythonPath)
             process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
             process.arguments = [
                 "-m", "uvicorn",
