@@ -168,17 +168,24 @@ struct ChatView: View {
                                 Image(nsImage: nsImage)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                    )
                                     .overlay(alignment: .topTrailing) {
                                         Button {
                                             viewModel.selectedImages.remove(at: index)
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.white, .black.opacity(0.6))
-                                                .padding(2)
+                                                .foregroundStyle(.white, Color.black.opacity(0.7))
+                                                .font(.system(size: 16))
+                                                .padding(4)
+                                                .background(Circle().fill(Color.white.opacity(0.2)))
                                         }
                                         .buttonStyle(.plain)
+                                        .offset(x: 4, y: -4)
                                     }
                             }
                         }
