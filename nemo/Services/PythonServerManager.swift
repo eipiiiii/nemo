@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 import os.log
 
 /// Manages the Python agent server process lifecycle
