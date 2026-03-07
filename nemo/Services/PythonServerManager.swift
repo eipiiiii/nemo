@@ -193,26 +193,46 @@ final class PythonServerManager: ObservableObject {
     
     /// Python実行ファイルを検索
     private func findPythonPath() throws -> String {
-        // Poetry仮想環境のPythonを優先
+        // 1. Poetry仮想環境のPythonを最優先
         let projectPath = (try? getProjectPath()) ?? ""
         let poetryVenvPython = "\(projectPath)/.venv/bin/python3"
         if FileManager.default.fileExists(atPath: poetryVenvPython) {
+            logger.info("✅ Using Poetry venv Python: \(poetryVenvPython)")
             return poetryVenvPython
         }
         
-        // システムのPythonを検索
-        let candidates = [
-            "/opt/homebrew/bin/python3",  // Apple Silicon Homebrew
-            "/usr/local/bin/python3",      // Intel Homebrew
-            "/usr/bin/python3",            // macOS system
+        // 2. バージョン指定の Python を優先（python3.13 のリンク壊れ対応）
+        let versionedCandidates = [
+            "/opt/homebrew/bin/python3.12",   // Python 3.12 (実際に動作するもの)
+            "/opt/homebrew/bin/python3.11",   // Python 3.11
+            "/usr/local/bin/python3.12",      // Intel Mac
+            "/usr/local/bin/python3.11",
         ]
-        for path in candidates {
+        for path in versionedCandidates {
             if FileManager.default.fileExists(atPath: path) {
+                logger.info("✅ Using versioned Python: \(path)")
                 return path
             }
         }
         
-        // whichコマンドで検索
+        // 3. 汎用的な python3 コマンド
+        let genericCandidates = [
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+            "/usr/bin/python3",
+        ]
+        for path in genericCandidates {
+            if FileManager.default.fileExists(atPath: path) {
+                // リンク先が実際に存在するか確認
+                let realPath = (path as NSString).resolvingSymlinksInPath
+                if FileManager.default.fileExists(atPath: realPath) {
+                    logger.info("✅ Using generic Python: \(path) -> \(realPath)")
+                    return path
+                }
+            }
+        }
+        
+        // 4. which コマンドで検索
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
         process.arguments = ["python3"]
@@ -222,14 +242,17 @@ final class PythonServerManager: ObservableObject {
         process.waitUntilExit()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !path.isEmpty {
+           !path.isEmpty,
+           FileManager.default.fileExists(atPath: path) {
+            logger.info("✅ Using Python from PATH: \(path)")
             return path
         }
         
         throw NSError(
             domain: "PythonServerManager",
             code: -2,
-            userInfo: [NSLocalizedDescriptionKey: "Python3 not found. Run ./setup.sh in nemo-agent directory."]
+            userInfo: [NSLocalizedDescriptionKey:
+                "Python 3.11+ not found. Install via: brew install python@3.12 && cd nemo-agent && poetry install"]
         )
     }
     
