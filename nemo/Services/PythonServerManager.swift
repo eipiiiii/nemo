@@ -44,11 +44,11 @@ final class PythonServerManager: ObservableObject {
             
             let process = Process()
             
-            // サンドボックス対応: /bin/bash 経由で Python を起動
+            // /bin/bash 経由で Poetry venv の Python を実行
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
             
-            // bash スクリプトとして実行
+            // bash スクリプトとして実行（Poetry venv をそのまま使用）
             let command = """
             cd "\(projectPath)" && \
             "\(pythonPath)" -m uvicorn src.api.main:app \
@@ -201,17 +201,15 @@ final class PythonServerManager: ObservableObject {
     
     /// Python実行ファイルを検索
     private func findPythonPath() throws -> String {
-        // 1. Poetry仮想環境のPythonを最優先
+        // 1. Poetry仮想環境のPythonを最優先（シンボリックリンクを解決しない）
         let projectPath = (try? getProjectPath()) ?? ""
         let poetryVenvPython = "\(projectPath)/.venv/bin/python3"
         if FileManager.default.fileExists(atPath: poetryVenvPython) {
-            // シンボリックリンクを解決
-            let resolved = (poetryVenvPython as NSString).resolvingSymlinksInPath
-            logger.info("✅ Using Poetry venv Python: \(poetryVenvPython) -> \(resolved)")
-            return resolved
+            logger.info("✅ Using Poetry venv Python: \(poetryVenvPython)")
+            return poetryVenvPython
         }
         
-        // 2. バージョン指定の Python を優先
+        // 2. バージョン指定の Python
         let versionedCandidates = [
             "/opt/homebrew/bin/python3.12",
             "/opt/homebrew/bin/python3.11",
@@ -220,9 +218,8 @@ final class PythonServerManager: ObservableObject {
         ]
         for path in versionedCandidates {
             if FileManager.default.fileExists(atPath: path) {
-                let resolved = (path as NSString).resolvingSymlinksInPath
-                logger.info("✅ Using versioned Python: \(path) -> \(resolved)")
-                return resolved
+                logger.info("✅ Using versioned Python: \(path)")
+                return path
             }
         }
         
@@ -234,11 +231,8 @@ final class PythonServerManager: ObservableObject {
         ]
         for path in genericCandidates {
             if FileManager.default.fileExists(atPath: path) {
-                let realPath = (path as NSString).resolvingSymlinksInPath
-                if FileManager.default.fileExists(atPath: realPath) {
-                    logger.info("✅ Using generic Python: \(path) -> \(realPath)")
-                    return realPath
-                }
+                logger.info("✅ Using generic Python: \(path)")
+                return path
             }
         }
         
@@ -255,7 +249,7 @@ final class PythonServerManager: ObservableObject {
         let home = NSHomeDirectory()
         let fm = FileManager.default
         
-        // 1. UserDefaults を最優先（サンドボックス対応）
+        // 1. UserDefaults を最優先
         if let override = UserDefaults.standard.string(forKey: "NemoAgentPath"),
            !override.isEmpty,
            fm.fileExists(atPath: override) {
