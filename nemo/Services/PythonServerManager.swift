@@ -87,9 +87,11 @@ final class PythonServerManager: ObservableObject {
         process.terminate()
         
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak self] in
-            if let process = self?.serverProcess, process.isRunning {
-                self?.logger.warning("Force killing server process")
-                process.interrupt()
+            Task { @MainActor in
+                if let process = self?.serverProcess, process.isRunning {
+                    self?.logger.warning("Force killing server process")
+                    process.interrupt()
+                }
             }
         }
         
@@ -152,14 +154,18 @@ final class PythonServerManager: ObservableObject {
         outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                self?.logger.info("[Server] \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                Task { @MainActor in
+                    self?.logger.info("[Server] \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                }
             }
         }
         
         errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                self?.logger.error("[Server Error] \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                Task { @MainActor in
+                    self?.logger.error("[Server Error] \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                }
             }
         }
     }
@@ -230,23 +236,23 @@ final class PythonServerManager: ObservableObject {
     /// nemo-agentのプロジェクトパスを解決
     private func getProjectPath() throws -> String {
         let bundlePath = Bundle.main.bundlePath
-        // Xcodeビルド: .../DerivedData/.../Build/Products/Debug/nemo.app
-        // リポジトリルート: 3階層上
-        let derivedPath = (bundlePath as NSString)
-            .deletingLastPathComponent  // Debug/
-            .deletingLastPathComponent  // Products/
-            .deletingLastPathComponent  // Build/
-            .deletingLastPathComponent  // ... (DerivedData project dir)
         
         // 複数の候補を試す
         let candidates = [
-            (derivedPath as NSString).appendingPathComponent("SourcePackages/../../../nemo-agent"),
+            // Xcode DerivedDataから3階層上がnemoリポジトリの想定
+            (bundlePath as NSString)
+                .deletingLastPathComponent  // Debug/
+                .deletingLastPathComponent  // Products/
+                .deletingLastPathComponent  // Build/
+                .deletingLastPathComponent  // DerivedData project dir
+                .appending("/SourcePackages/../../../nemo-agent"),
+            
             // Xcodeプロジェクトの兄弟ディレクトリ
-            ((bundlePath as NSString)
+            (bundlePath as NSString)
                 .deletingLastPathComponent
                 .deletingLastPathComponent
-                .deletingLastPathComponent as NSString)
-                .appendingPathComponent("nemo-agent"),
+                .deletingLastPathComponent
+                .appending("/nemo-agent"),
         ]
         
         for candidate in candidates {
