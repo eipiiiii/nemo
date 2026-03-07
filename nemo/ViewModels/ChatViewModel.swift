@@ -15,24 +15,17 @@ final class ChatViewModel: ObservableObject {
     @Published var streamingContent: String = ""
     @Published var isStreaming: Bool = false
     @Published var toolCallStatus: String? = nil
-
-    /// maxToolRounds 到達時に true になる → View がバナーを表示
     @Published var awaitingContinuationChoice: Bool = false
 
     private let conversationId: UUID
     private let modelContext: ModelContext
-    private let openRouterService = OpenRouterService()
-    private let toolRegistry = ToolRegistry.shared
     private let keychain = KeychainService.shared
     private let apiKeyKeychainKey = "openrouter_api_key"
-
-    /// 1セッションあたりの tool ラウンド上限
-    private let maxToolRoundsPerSession = 5
+    
+    /// LangGraph エージェントサーバーのベース URL
+    private let agentBaseURL = "http://localhost:8000"
 
     private var streamingTask: Task<Void, Never>?
-
-    /// ユーザーの続行 or 終了の選択を待つ continuation
-    private var continuationChoice: CheckedContinuation<Bool, Never>?
 
     init(conversationId: UUID, modelContext: ModelContext) {
         self.conversationId = conversationId
@@ -51,34 +44,12 @@ final class ChatViewModel: ObservableObject {
         AppLogger.chat.debug("💬 loadMessages: \(self.messages.count)件")
     }
 
-    // MARK: - ユーザーの続行選択
-
-    /// View の「続行する」ボタンから呼ぶ
-    func continueTool() {
-        AppLogger.chat.info("▶️ continueTool: ユーザーが続行を選択")
-        awaitingContinuationChoice = false
-        continuationChoice?.resume(returning: true)
-        continuationChoice = nil
-    }
-
-    /// View の「まとめて回答」ボタンから呼ぶ
-    func finishTool() {
-        AppLogger.chat.info("⏹️ finishTool: ユーザーが終了を選択")
-        awaitingContinuationChoice = false
-        continuationChoice?.resume(returning: false)
-        continuationChoice = nil
-    }
-
     // MARK: - Send
 
     func sendMessage() {
         let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (!trimmed.isEmpty || !selectedImages.isEmpty), !isLoading, !isStreaming else {
             AppLogger.chat.warning("⚠️ sendMessage スキップ: empty=\(trimmed.isEmpty && self.selectedImages.isEmpty) loading=\(self.isLoading) streaming=\(self.isStreaming)")
-            return
-        }
-        guard let apiKey = keychain.load(forKey: apiKeyKeychainKey), !apiKey.isEmpty else {
-            errorMessage = "APIキーが設定されていません。設定画面から入力してください。"
             return
         }
 
@@ -96,25 +67,12 @@ final class ChatViewModel: ObservableObject {
         messageText = ""
         selectedImages = []
 
-        let historyMessages: [[String: Any]] = messages
+        // 会話履歴を LangGraph 形式に変換 (tool_use は除外)
+        let historyMessages = messages
             .filter { $0.role != "tool_use" }
-            .map { msg in
-                if let imageData = msg.imageData, !imageData.isEmpty {
-                    var contentParts: [[String: Any]] = []
-                    if !msg.content.isEmpty {
-                        contentParts.append(["type": "text", "text": msg.content])
-                    }
-                    for data in imageData {
-                        let base64 = data.base64EncodedString()
-                        contentParts.append([
-                            "type": "image_url",
-                            "image_url": ["url": "data:image/jpeg;base64,\(base64)"]
-                        ])
-                    }
-                    return ["role": msg.role, "content": contentParts]
-                } else {
-                    return ["role": msg.role, "content": msg.content]
-                }
+            .map { msg -> [String: Any] in
+                // 画像対応は現時点ではスキップ（LangGraph 側で対応が必要）
+                return ["role": msg.role, "content": msg.content]
             }
 
         isStreaming = true
@@ -124,10 +82,9 @@ final class ChatViewModel: ObservableObject {
 
         streamingTask = Task {
             do {
-                try await runAgentLoop(
-                    initialMessages: historyMessages,
-                    modelId: modelId,
-                    apiKey: apiKey
+                try await streamAgentResponse(
+                    messages: historyMessages,
+                    modelId: modelId
                 )
             } catch {
                 AppLogger.chat.error("❌ sendMessage エラー: \(error)")
@@ -144,248 +101,138 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Agent Loop
+    // MARK: - LangGraph Agent Streaming
 
-    private func runAgentLoop(
-        initialMessages: [[String: Any]],
-        modelId: String,
-        apiKey: String
+    private func streamAgentResponse(
+        messages: [[String: Any]],
+        modelId: String
     ) async throws {
-        var messages = buildMessagesWithSystemPrompt(initialMessages)
-        let tools = toolRegistry.availableTools
-        var totalRounds = 0
+        guard let url = URL(string: "\(agentBaseURL)/agent/stream") else {
+            throw NSError(domain: "ChatViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid agent URL"])
+        }
 
-        AppLogger.chat.info("🤖 runAgentLoop 開始: maxRoundsPerSession=\(self.maxToolRoundsPerSession) tools=\(tools.count)件")
+        let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
+        let requestBody: [String: Any] = [
+            "messages": messages,
+            "model": modelId,
+            "custom_instructions": customPrompt
+        ]
 
-        // ユーザーが「続行する」を選ぶ限りセッションを繰り返す
-        while true {
-            let sessionLimit = totalRounds + maxToolRoundsPerSession
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        request.timeoutInterval = 300 // 5分
 
-            // 1セッション分のループ
-            var sessionFinished = false
-            while totalRounds < sessionLimit {
-                guard !Task.isCancelled else {
-                    AppLogger.chat.info("⏹️ runAgentLoop キャンセル: round=\(totalRounds)")
-                    return
-                }
-                totalRounds += 1
-                AppLogger.chat.info("🔄 ラウンド \(totalRounds) 開始: messages=\(messages.count)件")
+        AppLogger.chat.info("📡 LangGraph agent stream 開始: \(url)")
 
-                let result = try await openRouterService.sendRound(
-                    messages: messages,
-                    modelId: modelId,
-                    tools: tools,
-                    apiKey: apiKey
-                ) { [weak self] chunk in
-                    guard let self else { return }
-                    await MainActor.run { self.streamingContent += chunk }
-                }
+        let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "ChatViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])
+        }
 
-                switch result {
-                case .toolCalls(let toolCalls, let assistantContent):
-                    AppLogger.chat.info("🔧 tool_calls 検出: \(toolCalls.map { $0.name }.joined(separator: ", "))")
+        guard httpResponse.statusCode == 200 else {
+            throw NSError(domain: "ChatViewModel", code: httpResponse.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode)"])
+        }
 
-                    // 中間テキストがあれば tool_use より先に DB 保存
-                    if let content = assistantContent, !content.isEmpty {
-                        let intermediateMsg = Conversation(
-                            id: UUID(), role: "assistant", content: content,
-                            timestamp: Date(), conversationId: conversationId
-                        )
-                        modelContext.insert(intermediateMsg)
-                        try? modelContext.save()
-                        loadMessages()
-                        streamingContent = ""
-                        AppLogger.chat.info("💾 中間 assistant メッセージ保存: \(content.count)文字")
+        var currentText = ""
+        var currentToolName: String? = nil
+        var currentToolInput: String? = nil
+        var currentToolOutput: String? = nil
+
+        for try await line in asyncBytes.lines {
+            guard !Task.isCancelled else {
+                AppLogger.chat.info("⏹️ streamAgentResponse キャンセル")
+                return
+            }
+
+            guard line.hasPrefix("data: ") else { continue }
+            let jsonString = line.dropFirst(6)
+            guard let data = jsonString.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                continue
+            }
+
+            let eventType = json["type"] as? String ?? ""
+
+            switch eventType {
+            case "text_chunk":
+                if let chunk = json["content"] as? String {
+                    currentText += chunk
+                    await MainActor.run {
+                        streamingContent += chunk
                     }
+                }
 
-                    var assistantMsg: [String: Any] = ["role": "assistant"]
-                    if let content = assistantContent { assistantMsg["content"] = content }
-                    assistantMsg["tool_calls"] = toolCalls.map { tc -> [String: Any] in
-                        [
-                            "id": tc.id,
-                            "type": "function",
-                            "function": ["name": tc.name, "arguments": tc.arguments] as [String: Any],
-                        ]
-                    }
-                    messages.append(assistantMsg)
+            case "tool_call":
+                let toolName = json["tool_name"] as? String ?? "unknown"
+                let toolInput = json["tool_input"] as? String ?? "{}"
+                currentToolName = toolName
+                currentToolInput = toolInput
+                AppLogger.chat.info("🔧 tool_call: \(toolName)")
+                await MainActor.run {
+                    toolCallStatus = "🔧 \(toolName) 実行中..."
+                }
 
-                    for toolCall in toolCalls {
-                        AppLogger.chat.info("🔧 tool call: \(toolCall.name) args=\(toolCall.arguments)")
-                        await MainActor.run { toolCallStatus = "🔧 \(toolCall.name) 実行中..." }
-
-                        let toolResult = await toolRegistry.execute(
-                            toolCallId: toolCall.id,
-                            name: toolCall.name,
-                            arguments: toolCall.arguments
-                        )
-                        AppLogger.tool.info("✅ tool 結果: \(toolResult.content)")
-
+            case "tool_result":
+                if let toolOutput = json["tool_output"] as? String {
+                    currentToolOutput = toolOutput
+                    AppLogger.chat.info("✅ tool_result: \(toolOutput.prefix(100))")
+                    
+                    // tool_use メッセージを DB に保存
+                    if let toolName = currentToolName {
                         let toolBlock = Conversation(
                             id: UUID(), role: "tool_use", content: "",
                             timestamp: Date(), conversationId: conversationId,
-                            toolName: toolResult.name, toolResult: toolResult.content
+                            toolName: toolName, toolResult: toolOutput
                         )
                         modelContext.insert(toolBlock)
                         try? modelContext.save()
                         loadMessages()
-
-                        messages.append([
-                            "role": "tool",
-                            "tool_call_id": toolResult.toolCallId,
-                            "content": toolResult.content,
-                        ])
                     }
-                    await MainActor.run { toolCallStatus = nil }
-
-                case .finished:
-                    AppLogger.chat.info("✅ ラウンド \(totalRounds): 最終回答完了 \(self.streamingContent.count)文字")
-                    guard !Task.isCancelled, !streamingContent.isEmpty else {
-                        AppLogger.chat.warning("⚠️ ストリーミング: キャンセル or 空")
-                        return
+                    
+                    await MainActor.run {
+                        toolCallStatus = nil
                     }
-                    let assistantMessage = Conversation(
-                        id: UUID(), role: "assistant", content: streamingContent,
-                        timestamp: Date(), conversationId: conversationId
-                    )
-                    modelContext.insert(assistantMessage)
-                    try? modelContext.save()
-                    loadMessages()
-                    sessionFinished = true
-                    return
                 }
-            }
 
-            if sessionFinished { return }
-
-            // セッション上限到達 → ユーザーに選択させる
-            AppLogger.chat.warning("⚠️ \(totalRounds)ラウンド到達 → ユーザーに続行確認")
-            await MainActor.run {
-                toolCallStatus = nil
-                awaitingContinuationChoice = true
-            }
-
-            // ユーザーの選択を待機（続行: true / 終了: false）
-            let shouldContinue = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-                self.continuationChoice = cont
-            }
-
-            if shouldContinue {
-                // さらに maxToolRoundsPerSession ラウンド許可して while ループ継続
-                AppLogger.chat.info("▶️ 続行: さらに\(self.maxToolRoundsPerSession)ラウンド追加")
-                continue
-            } else {
-                // 強制終了: tool なし + まとめ指示メッセージ
-                AppLogger.chat.info("⏹️ 終了: まとめ回答へ")
-                messages.append([
-                    "role": "user",
-                    "content": """
-                    FINAL ANSWER REQUIRED.
-
-                    You have used all available tool calls. Now write your complete response as plain text only.
-
-                    STRICT RULES - violating any of these is an error:
-                    - Do NOT write <tool_call> tags
-                    - Do NOT write JSON function calls
-                    - Do NOT write any code blocks that represent tool invocations
-                    - Do NOT say you need more information
-                    - Do NOT ask to search again
-
-                    Using ONLY the information already collected above, write your final answer now in natural language using Markdown.
-                    """,
-                ])
-                let _ = try await openRouterService.sendRound(
-                    messages: messages,
-                    modelId: modelId,
-                    tools: [],
-                    apiKey: apiKey
-                ) { [weak self] chunk in
-                    guard let self else { return }
-                    await MainActor.run { self.streamingContent += chunk }
+            case "error":
+                let errorMsg = json["message"] as? String ?? "Unknown error"
+                AppLogger.chat.error("❌ Agent error: \(errorMsg)")
+                await MainActor.run {
+                    errorMessage = errorMsg
                 }
-                guard !Task.isCancelled, !streamingContent.isEmpty else { return }
-                AppLogger.chat.info("🤖 まとめ回答:\n\(self.streamingContent.prefix(200))")
-                let assistantMessage = Conversation(
-                    id: UUID(), role: "assistant", content: streamingContent,
-                    timestamp: Date(), conversationId: conversationId
-                )
-                modelContext.insert(assistantMessage)
-                try? modelContext.save()
-                loadMessages()
-                return
+
+            case "end":
+                AppLogger.chat.info("🏁 Agent stream 終了")
+                break
+
+            default:
+                break
             }
         }
-    }
 
-    // MARK: - System Prompt
-
-    private func buildMessagesWithSystemPrompt(_ messages: [[String: Any]]) -> [[String: Any]] {
-        let customPrompt = UserDefaults.standard.string(forKey: "custom_prompt") ?? ""
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm (EEEE)"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        let currentTimeString = formatter.string(from: Date())
-        let tzName = TimeZone.current.identifier
-
-        let toolGuidelines = toolRegistry.availableTools
-            .sorted { $0.name < $1.name }
-            .map { "- `\($0.name)`: \($0.function.description)" }
-            .joined(separator: "\n")
-        let toolNameList = toolRegistry.availableTools
-            .map { $0.name }.sorted().joined(separator: ", ")
-
-        var systemContent = """
-            You are nemo, a helpful AI assistant running on macOS.
-
-            <environment>
-            Current time: \(currentTimeString)
-            Timezone: \(tzName)
-            </environment>
-
-            # Core Principles
-            - Be accurate, concise, and honest.
-            - If you are unsure about something, say so rather than guessing.
-            - For time-sensitive information (news, weather, prices, etc.), always use tools to get up-to-date data instead of relying on training knowledge.
-
-            # Tools
-            You have access to exactly these tools: \(toolNameList)
-
-            **Tool usage guidelines:**
-            \(toolGuidelines)
-
-            **Rules that must always be followed:**
-            - Only call tools listed above. Never call a tool that is not in the list above, even if you believe it exists.
-            - If a tool call returns an error, do not retry the same call. Explain the problem to the user instead.
-            - Do not call multiple tools in the same round unless they are fully independent.
-
-            # Response Formatting
-            Your responses are rendered with MarkdownUI. Use Markdown formatting effectively:
-            - Use **bold** for emphasis on important points
-            - Use `inline code` for variable names, commands, or short code snippets
-            - Use fenced code blocks with language tags for multi-line code
-            - Use ## headings to structure longer responses
-            - Use bullet lists or numbered lists for multiple items
-            - Use > blockquotes for important notes or warnings
-            - Use tables when comparing multiple items
-            """
-        if !customPrompt.isEmpty {
-            systemContent += "\n\n# Custom Instructions\n\(customPrompt)"
+        // 最終的な assistant メッセージを保存
+        guard !Task.isCancelled, !currentText.isEmpty else {
+            AppLogger.chat.warning("⚠️ ストリーミング: キャンセル or 空")
+            return
         }
 
-        var all: [[String: Any]] = [["role": "system", "content": systemContent]]
-        all.append(contentsOf: messages)
-        AppLogger.chat.debug("📋 buildMessages: システムプロンプト追加後 \(all.count)件")
-        return all
+        let assistantMessage = Conversation(
+            id: UUID(), role: "assistant", content: currentText,
+            timestamp: Date(), conversationId: conversationId
+        )
+        modelContext.insert(assistantMessage)
+        try? modelContext.save()
+        loadMessages()
+        AppLogger.chat.info("💾 最終 assistant メッセージ保存: \(currentText.count)文字")
     }
+
+    // MARK: - Cancel
 
     func cancelStreaming() {
         AppLogger.chat.info("⏹️ cancelStreaming")
-        // 選択待ち中にキャンセルされた場合は continuation を終了で解決
-        if awaitingContinuationChoice {
-            continuationChoice?.resume(returning: false)
-            continuationChoice = nil
-            awaitingContinuationChoice = false
-        }
         streamingTask?.cancel()
         streamingTask = nil
         if !streamingContent.isEmpty {
@@ -402,5 +249,17 @@ final class ChatViewModel: ObservableObject {
         isStreaming = false
         streamingContent = ""
         toolCallStatus = nil
+    }
+    
+    // MARK: - Legacy methods (互換性のため残す)
+    
+    func continueTool() {
+        // LangGraph では使わないが、View が呼び出す可能性があるので空実装
+        AppLogger.chat.warning("⚠️ continueTool is not used in LangGraph mode")
+    }
+    
+    func finishTool() {
+        // LangGraph では使わないが、View が呼び出す可能性があるので空実装
+        AppLogger.chat.warning("⚠️ finishTool is not used in LangGraph mode")
     }
 }
