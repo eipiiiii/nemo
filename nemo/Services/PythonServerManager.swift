@@ -235,24 +235,24 @@ final class PythonServerManager: ObservableObject {
     
     /// nemo-agentのプロジェクトパスを解決
     private func getProjectPath() throws -> String {
-        let bundlePath = Bundle.main.bundlePath
+        let bundlePath = Bundle.main.bundlePath as NSString
         
         // 複数の候補を試す
-        let candidates = [
+        let candidates: [String] = [
             // Xcode DerivedDataから3階層上がnemoリポジトリの想定
-            (bundlePath as NSString)
+            bundlePath
                 .deletingLastPathComponent  // Debug/
                 .deletingLastPathComponent  // Products/
                 .deletingLastPathComponent  // Build/
                 .deletingLastPathComponent  // DerivedData project dir
-                .appending("/SourcePackages/../../../nemo-agent"),
+                + "/SourcePackages/../../../nemo-agent",
             
             // Xcodeプロジェクトの兄弟ディレクトリ
-            (bundlePath as NSString)
+            bundlePath
                 .deletingLastPathComponent
                 .deletingLastPathComponent
                 .deletingLastPathComponent
-                .appending("/nemo-agent"),
+                + "/nemo-agent",
         ]
         
         for candidate in candidates {
