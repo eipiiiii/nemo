@@ -234,39 +234,82 @@ final class PythonServerManager: ObservableObject {
     }
     
     /// nemo-agentのプロジェクトパスを解決
+    ///
+    /// 問題: Xcodeビルド時、Bundle.main.bundlePath は DerivedData 内を指す
+    /// (~/.../DerivedData/nemo-xxxx/Build/Products/Debug/nemo.app)
+    /// そこからの相対パスではリポジトリルートに届かない。
+    /// 解決策: DerivedData の WorkspaceSettings を参照するか、
+    /// ホームディレクトリ配下の一般的な開発ディレクトリを探索する。
     private func getProjectPath() throws -> String {
-        let bundlePath = Bundle.main.bundlePath as NSString
+        let home = NSHomeDirectory()
+        let fm = FileManager.default
         
-        // 複数の候補を試す
-        let candidates: [String] = [
-            // Xcode DerivedDataから3階層上がnemoリポジトリの想定
-            (((bundlePath
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent
-                + "/SourcePackages/../../../nemo-agent",
-            
-            // Xcodeプロジェクトの兄弟ディレクトリ
-            (((bundlePath
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent as NSString)
-                .deletingLastPathComponent
-                + "/nemo-agent",
+        // 1. DerivedData の WorkspaceSettings.xcsettings から SRCROOT を取得
+        if let srcRoot = derivedDataSourceRoot() {
+            let candidate = (srcRoot as NSString).appendingPathComponent("nemo-agent")
+            if fm.fileExists(atPath: candidate) {
+                logger.info("✅ nemo-agent found via DerivedData SRCROOT: \(candidate)")
+                return candidate
+            }
+        }
+        
+        // 2. ホームディレクトリ配下の一般的な開発ディレクトリを探索
+        let searchRoots = [
+            home + "/Developer",
+            home + "/Documents",
+            home + "/Desktop",
+            home + "/Projects",
+            home,
         ]
         
-        for candidate in candidates {
+        for root in searchRoots {
+            let candidate = (root as NSString).appendingPathComponent("nemo/nemo-agent")
             let resolved = (candidate as NSString).standardizingPath
-            if FileManager.default.fileExists(atPath: resolved) {
+            if fm.fileExists(atPath: resolved) {
+                logger.info("✅ nemo-agent found at: \(resolved)")
                 return resolved
             }
+        }
+        
+        // 3. UserDefaults による手動オーバーライド（デバッグ用）
+        if let override = UserDefaults.standard.string(forKey: "NemoAgentPath"),
+           !override.isEmpty,
+           fm.fileExists(atPath: override) {
+            logger.info("✅ nemo-agent found via UserDefaults override: \(override)")
+            return override
         }
         
         throw NSError(
             domain: "PythonServerManager",
             code: -3,
-            userInfo: [NSLocalizedDescriptionKey: "nemo-agent directory not found. Check repository structure."]
+            userInfo: [NSLocalizedDescriptionKey:
+                "nemo-agent directory not found. " +
+                "Searched in ~/Developer, ~/Documents, ~/Desktop, ~/Projects. " +
+                "Override with: UserDefaults.standard.set('/path/to/nemo/nemo-agent', forKey: 'NemoAgentPath')"]
         )
+    }
+    
+    /// DerivedData の WorkspaceSettings から元のソースディレクトリを取得
+    private func derivedDataSourceRoot() -> String? {
+        let bundlePath = Bundle.main.bundlePath as NSString
+        
+        // DerivedData/nemo-xxxx/ を目指して上に辿る
+        // nemo.app -> Debug -> Products -> Build -> DerivedData/nemo-xxxx
+        var path = bundlePath as String
+        for _ in 0..<4 {
+            path = (path as NSString).deletingLastPathComponent
+        }
+        
+        // WorkspaceSettings.xcsettings を確認
+        let settingsPath = (path as NSString)
+            .appendingPathComponent("info.plist")
+        
+        guard let info = NSDictionary(contentsOfFile: settingsPath),
+              let workspacePath = info["WorkspacePath"] as? String else {
+            return nil
+        }
+        
+        // .xcworkspace または .xcodeproj の親ディレクトリがリポジトリルート
+        return (workspacePath as NSString).deletingLastPathComponent
     }
 }
