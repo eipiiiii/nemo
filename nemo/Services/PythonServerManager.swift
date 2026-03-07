@@ -42,23 +42,27 @@ final class PythonServerManager: ObservableObject {
             logger.info("Python path: \(pythonPath)")
             logger.info("Project path: \(projectPath)")
             
-            // シンボリックリンクを解決して実体パスを取得
-            let resolvedPythonPath = (pythonPath as NSString).resolvingSymlinksInPath
-            logger.info("✅ Resolved Python path: \(resolvedPythonPath)")
-            
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: resolvedPythonPath)
+            
+            // サンドボックス対応: /bin/bash 経由で Python を起動
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
-            process.arguments = [
-                "-m", "uvicorn",
-                "src.api.main:app",
-                "--host", "127.0.0.1",
-                "--port", "8000",
-                "--log-level", "info"
-            ]
+            
+            // bash スクリプトとして実行
+            let command = """
+            cd "\(projectPath)" && \
+            "\(pythonPath)" -m uvicorn src.api.main:app \
+                --host 127.0.0.1 \
+                --port 8000 \
+                --log-level info
+            """
+            
+            process.arguments = ["-c", command]
             
             // KeychainからAPIキーを取得して環境変数として渡す
             process.environment = buildEnvironment()
+            
+            logger.info("🚀 Launching server with command: \(command)")
             
             setupProcessOutput(process)
             
@@ -201,25 +205,28 @@ final class PythonServerManager: ObservableObject {
         let projectPath = (try? getProjectPath()) ?? ""
         let poetryVenvPython = "\(projectPath)/.venv/bin/python3"
         if FileManager.default.fileExists(atPath: poetryVenvPython) {
-            logger.info("✅ Using Poetry venv Python: \(poetryVenvPython)")
-            return poetryVenvPython
+            // シンボリックリンクを解決
+            let resolved = (poetryVenvPython as NSString).resolvingSymlinksInPath
+            logger.info("✅ Using Poetry venv Python: \(poetryVenvPython) -> \(resolved)")
+            return resolved
         }
         
-        // 2. バージョン指定の Python を優先（python3.13 のリンク壊れ対応）
+        // 2. バージョン指定の Python を優先
         let versionedCandidates = [
-            "/opt/homebrew/bin/python3.12",   // Python 3.12 (実際に動作するもの)
-            "/opt/homebrew/bin/python3.11",   // Python 3.11
-            "/usr/local/bin/python3.12",      // Intel Mac
+            "/opt/homebrew/bin/python3.12",
+            "/opt/homebrew/bin/python3.11",
+            "/usr/local/bin/python3.12",
             "/usr/local/bin/python3.11",
         ]
         for path in versionedCandidates {
             if FileManager.default.fileExists(atPath: path) {
-                logger.info("✅ Using versioned Python: \(path)")
-                return path
+                let resolved = (path as NSString).resolvingSymlinksInPath
+                logger.info("✅ Using versioned Python: \(path) -> \(resolved)")
+                return resolved
             }
         }
         
-        // 3. 汎用的な python3 コマンド
+        // 3. 汎用的な python3
         let genericCandidates = [
             "/opt/homebrew/bin/python3",
             "/usr/local/bin/python3",
@@ -227,36 +234,19 @@ final class PythonServerManager: ObservableObject {
         ]
         for path in genericCandidates {
             if FileManager.default.fileExists(atPath: path) {
-                // リンク先が実際に存在するか確認
                 let realPath = (path as NSString).resolvingSymlinksInPath
                 if FileManager.default.fileExists(atPath: realPath) {
                     logger.info("✅ Using generic Python: \(path) -> \(realPath)")
-                    return path
+                    return realPath
                 }
             }
-        }
-        
-        // 4. which コマンドで検索
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["python3"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        try process.run()
-        process.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !path.isEmpty,
-           FileManager.default.fileExists(atPath: path) {
-            logger.info("✅ Using Python from PATH: \(path)")
-            return path
         }
         
         throw NSError(
             domain: "PythonServerManager",
             code: -2,
             userInfo: [NSLocalizedDescriptionKey:
-                "Python 3.11+ not found. Install via: brew install python@3.12 && cd nemo-agent && poetry install"]
+                "Python 3.11+ not found. Install via: brew install python@3.12"]
         )
     }
     
@@ -265,7 +255,15 @@ final class PythonServerManager: ObservableObject {
         let home = NSHomeDirectory()
         let fm = FileManager.default
         
-        // 1. DerivedData の WorkspaceSettings から SRCROOT を取得
+        // 1. UserDefaults を最優先（サンドボックス対応）
+        if let override = UserDefaults.standard.string(forKey: "NemoAgentPath"),
+           !override.isEmpty,
+           fm.fileExists(atPath: override) {
+            logger.info("✅ nemo-agent found via UserDefaults: \(override)")
+            return override
+        }
+        
+        // 2. DerivedData の WorkspaceSettings
         if let srcRoot = derivedDataSourceRoot() {
             let candidate = (srcRoot as NSString).appendingPathComponent("nemo-agent")
             if fm.fileExists(atPath: candidate) {
@@ -274,9 +272,9 @@ final class PythonServerManager: ObservableObject {
             }
         }
         
-        // 2. ホームディレクトリ配下の開発ディレクトリを探索
+        // 3. ホームディレクトリ配下を探索
         let searchPaths = [
-            home + "/Projects/swift/nemo/nemo-agent",  // あなたの環境
+            home + "/Projects/swift/nemo/nemo-agent",
             home + "/Developer/nemo/nemo-agent",
             home + "/Documents/nemo/nemo-agent",
             home + "/Desktop/nemo/nemo-agent",
@@ -292,14 +290,6 @@ final class PythonServerManager: ObservableObject {
             }
         }
         
-        // 3. UserDefaults による手動オーバーライド（デバッグ用）
-        if let override = UserDefaults.standard.string(forKey: "NemoAgentPath"),
-           !override.isEmpty,
-           fm.fileExists(atPath: override) {
-            logger.info("✅ nemo-agent found via UserDefaults: \(override)")
-            return override
-        }
-        
         throw NSError(
             domain: "PythonServerManager",
             code: -3,
@@ -311,21 +301,15 @@ final class PythonServerManager: ObservableObject {
     /// DerivedData の info.plist から元のソースディレクトリを取得
     private func derivedDataSourceRoot() -> String? {
         let bundlePath = Bundle.main.bundlePath as NSString
-        
-        // nemo.app -> Debug -> Products -> Build -> DerivedData/nemo-xxxx
         var path = bundlePath as String
         for _ in 0..<4 {
             path = (path as NSString).deletingLastPathComponent
         }
-        
         let settingsPath = (path as NSString).appendingPathComponent("info.plist")
-        
         guard let info = NSDictionary(contentsOfFile: settingsPath),
               let workspacePath = info["WorkspacePath"] as? String else {
             return nil
         }
-        
-        // .xcworkspace または .xcodeproj の親ディレクトリがリポジトリルート
         return (workspacePath as NSString).deletingLastPathComponent
     }
 }
